@@ -114,6 +114,9 @@ describe('EvaluationAnalysis', () => {
     render(<EvaluationAnalysis />)
 
     expect(await screen.findAllByRole('checkbox')).toHaveLength(10)
+    expect(
+      screen.getByLabelText('급식 평가 날짜 선택'),
+    ).toBeInTheDocument()
     await user.click(screen.getByText('예시학교1'))
     await user.click(screen.getByText('예시학교2'))
 

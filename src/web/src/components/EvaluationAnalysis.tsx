@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { getRandomSchools, runEvaluation } from '../agent-client/client'
 import type {
@@ -6,6 +6,8 @@ import type {
   EvaluationSchool,
   EvaluationStep,
 } from '../agent-client/types'
+import { DatePicker } from './DateRangePicker'
+import { isoToLocalDate, localDateToIso } from '../lib/dateRange'
 import { getEvaluationDateBounds } from '../lib/evaluationDate'
 
 const CRITERIA = {
@@ -158,10 +160,9 @@ function ResultPanel({ result }: { result: BattleEvaluation }) {
 }
 
 export function EvaluationAnalysis() {
-  const bounds = useMemo(() => getEvaluationDateBounds(), [])
   const [schools, setSchools] = useState<EvaluationSchool[]>([])
   const [selected, setSelected] = useState<string[]>([])
-  const [date, setDate] = useState(bounds.max)
+  const [date, setDate] = useState(() => getEvaluationDateBounds().max)
   const [prompt, setPrompt] = useState('')
   const [promptEdited, setPromptEdited] = useState(false)
   const [loadingSchools, setLoadingSchools] = useState(true)
@@ -289,16 +290,14 @@ export function EvaluationAnalysis() {
           )}
         </div>
 
-        <div className="analysis-field compact">
-          <label htmlFor="evaluation-date">2. 평가 날짜</label>
-          <input
-            id="evaluation-date"
-            type="date"
-            min={bounds.min}
-            max={bounds.max}
-            value={date}
-            onChange={(event) => {
-              setDate(event.target.value)
+        <div className="analysis-field">
+          <h3>2. 평가 날짜</h3>
+          <DatePicker
+            mode="single"
+            date={isoToLocalDate(date)}
+            onChange={(selectedDate) => {
+              if (!selectedDate) return
+              setDate(localDateToIso(selectedDate))
               setPromptEdited(false)
             }}
           />
