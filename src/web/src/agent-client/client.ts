@@ -44,6 +44,7 @@ export async function runEvaluation(
   request: EvaluationRequest,
   onProgress: ProgressHandler,
 ): Promise<BattleEvaluation> {
+  let runErrorMessage: string | null = null
   const agent = new HttpAgent({
     url: '/ag-ui/evaluate',
     initialMessages: [
@@ -55,19 +56,35 @@ export async function runEvaluation(
     ],
   })
 
-  const run = await agent.runAgent(
-    {},
-    {
-      onStepStartedEvent: ({ event }) => {
-        const step = stepFromEvent(event)
-        if (step) onProgress(step, 'running')
+  let run
+  try {
+    run = await agent.runAgent(
+      {},
+      {
+        onStepStartedEvent: ({ event }) => {
+          const step = stepFromEvent(event)
+          if (step) onProgress(step, 'running')
+        },
+        onStepFinishedEvent: ({ event }) => {
+          const step = stepFromEvent(event)
+          if (step) onProgress(step, 'done')
+        },
+        onRunErrorEvent: ({ event }) => {
+          runErrorMessage = event.message
+        },
       },
-      onStepFinishedEvent: ({ event }) => {
-        const step = stepFromEvent(event)
-        if (step) onProgress(step, 'done')
-      },
-    },
-  )
+    )
+  } catch (error) {
+    if (runErrorMessage?.includes('선택한 기간에 중식 정보가 없습니다.')) {
+      throw new Error(
+        '선택한 학교 중 해당 날짜의 중식 정보가 없는 학교가 있습니다. 다른 학교나 날짜를 선택해 주세요.',
+      )
+    }
+    if (runErrorMessage) {
+      throw new Error(runErrorMessage)
+    }
+    throw error
+  }
 
   const finalMessage = [...run.newMessages]
     .reverse()
