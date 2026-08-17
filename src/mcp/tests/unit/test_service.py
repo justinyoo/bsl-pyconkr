@@ -1,13 +1,14 @@
 """도구 서비스 입력 검증과 정규화 테스트."""
 
+import random
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 import pytest
 
 from bsl_mcp.client import FixtureNeisClient
-from bsl_mcp.exceptions import SchoolNotFoundError
-from bsl_mcp.service import get_school_lunches, search_schools
+from bsl_mcp.exceptions import MealsNotFoundError, SchoolNotFoundError
+from bsl_mcp.service import get_school_lunches, list_random_schools, search_schools
 
 
 @pytest.mark.anyio
@@ -32,6 +33,22 @@ async def test_search_schools_reports_no_results() -> None:
 
 
 @pytest.mark.anyio
+async def test_list_random_schools_returns_requested_unique_candidates() -> None:
+    result = await list_random_schools(
+        FixtureNeisClient(), count=10, rng=random.Random(7)
+    )
+
+    assert result.total == 10
+    assert len({school.school_code for school in result.schools}) == 10
+
+
+@pytest.mark.anyio
+async def test_list_random_schools_rejects_invalid_count() -> None:
+    with pytest.raises(ValueError, match="2개 이상 10개 이하"):
+        await list_random_schools(FixtureNeisClient(), count=1)
+
+
+@pytest.mark.anyio
 async def test_get_school_lunches_normalizes_and_sorts_meals() -> None:
     today = datetime.now(tz=ZoneInfo("Asia/Seoul")).date()
     yesterday = today - timedelta(days=1)
@@ -46,6 +63,20 @@ async def test_get_school_lunches_normalizes_and_sorts_meals() -> None:
     assert [meal.date for meal in result.meals] == [yesterday, today]
     assert result.meals[0].dishes == ["현미밥", "된장찌개", "제육볶음"]
     assert result.meals[0].serving_count == 450
+
+
+@pytest.mark.anyio
+async def test_fixture_school_without_meals_reports_no_data() -> None:
+    today = datetime.now(tz=ZoneInfo("Asia/Seoul")).date()
+
+    with pytest.raises(MealsNotFoundError):
+        await get_school_lunches(
+            FixtureNeisClient(),
+            education_office_code="B10",
+            school_code="7010010",
+            from_date=today,
+            to_date=today,
+        )
 
 
 @pytest.mark.anyio

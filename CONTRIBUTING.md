@@ -43,6 +43,31 @@ uv sync --locked
 uv run pytest
 ```
 
+멀티에이전트 앱(`src/agent`) 설정 및 검사:
+
+```sh
+cd src/agent
+uv sync --locked
+uv run pytest
+```
+
+실제 Copilot 모델을 사용하는 로컬 실행 전에는 Copilot CLI 인증을
+완료합니다. `COPILOT_MODEL`을 비워 두면 SDK 기본 모델을 사용합니다.
+
+```sh
+cd src/agent
+uv run bsl-agent
+```
+
+워크플로우를 DevUI에서 확인하려면 `http://localhost:8080`을 엽니다.
+루트의 `run-app` 스크립트는 DevUI를 함께 실행합니다. 에이전트 앱만 개발할
+때는 별도 터미널에서 다음 명령을 사용할 수 있습니다.
+
+```sh
+cd src/agent
+uv run bsl-agent-devui
+```
+
 MCP 서버를 단독 실행하려면 실제 NEIS API 키를 지정하거나 fixture 모드를
 사용합니다.
 
@@ -81,13 +106,14 @@ NEIS API 키 없이도 결정적으로 동작합니다. 아래처럼 애플리�
 `NEIS_FIXTURE_MODE=true`를 지정):
 
 ```sh
-NEIS_FIXTURE_MODE=true docker compose up --build
+NEIS_FIXTURE_MODE=true AGENT_FIXTURE_MODE=true docker compose up --build
 ```
 
 실제 NEIS API를 연동하려면 `.env.example`을 `.env`로 복사한 후
 `NEIS_API_KEY` 값을 채워 `docker compose up --build`를 실행합니다.
 
-저장소 루트에서 프론트엔드, 백엔드와 MCP 서버를 한 번에 실행하거나 전체
+저장소 루트에서 프론트엔드, 백엔드, MCP 서버와 에이전트 앱을 한 번에
+실행하거나 전체
 테스트를 실행하려면 운영체제에 맞는 스크립트를 사용합니다.
 
 ```sh
@@ -100,7 +126,8 @@ NEIS_FIXTURE_MODE=true docker compose up --build
 .\scripts\run-test.ps1
 ```
 
-전체 테스트 스크립트는 백엔드, MCP 서버와 프론트엔드 테스트를 실행한 후
+전체 테스트 스크립트는 백엔드, MCP 서버, 에이전트 앱과 프론트엔드 테스트를
+실행한 후
 fixture 모드의 별도 Docker Compose 스택을 시작해 Playwright E2E 테스트까지
 실행하고 자동으로 정리합니다.
 

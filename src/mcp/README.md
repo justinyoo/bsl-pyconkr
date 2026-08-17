@@ -10,6 +10,8 @@ NEIS_API_KEY=... uv run bsl-mcp
 ```
 
 fixture 모드에서는 실제 인증키나 NEIS 네트워크가 필요하지 않습니다.
+`가온예시고등학교`는 급식 정보가 없는 부분 분석 흐름을 확인하기 위한
+fixture입니다.
 
 ```sh
 NEIS_FIXTURE_MODE=true uv run bsl-mcp

@@ -1,0 +1,35 @@
+[project]
+name = "bsl-agent"
+version = "0.1.0"
+description = "급식 배틀 멀티에이전트 평가 서비스"
+readme = "README.md"
+authors = [
+    { name = "Justin Yoo", email = "justin.yoojh@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "agent-framework-ag-ui>=1.1,<2",
+    "agent-framework-devui>=1.0.0b260813,<2",
+    "agent-framework-github-copilot>=1.0,<2",
+    "fastapi>=0.115,<1",
+    "mcp>=1.29,<2",
+    "pydantic-settings>=2.6,<3",
+    "uvicorn[standard]>=0.34,<1",
+]
+
+[project.scripts]
+bsl-agent = "bsl_agent.app:main"
+bsl-agent-devui = "bsl_agent.devui:main"
+
+[build-system]
+requires = ["uv_build>=0.12.5,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "httpx>=0.27,<1",
+    "pytest>=8.3,<9",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

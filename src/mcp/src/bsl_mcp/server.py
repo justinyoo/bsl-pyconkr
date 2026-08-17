@@ -17,7 +17,7 @@ from bsl_mcp.exceptions import (
     SchoolNotFoundError,
 )
 from bsl_mcp.models import SchoolMealsResult, SchoolSearchResult
-from bsl_mcp.service import get_school_lunches, search_schools
+from bsl_mcp.service import get_school_lunches, list_random_schools, search_schools
 from bsl_mcp.settings import Settings
 
 T = TypeVar("T")
@@ -70,6 +70,22 @@ def create_server(
         json_response=True,
         log_level=settings.log_level,
     )
+
+    @server.tool(
+        name="list_random_schools",
+        title="무작위 학교 후보 조회",
+        description=(
+            "급식 비교 화면에서 선택할 무작위 학교 후보를 최대 10개 반환합니다."
+        ),
+    )
+    async def list_random_schools_tool(
+        count: Annotated[
+            int, Field(default=10, ge=2, le=10, description="반환할 학교 후보 수")
+        ] = 10,
+    ) -> SchoolSearchResult:
+        return await _as_tool_error(
+            lambda: list_random_schools(neis_client, count=count)
+        )
 
     @server.tool(
         name="search_schools",

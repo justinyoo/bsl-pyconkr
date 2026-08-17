@@ -13,6 +13,7 @@ async def test_lists_expected_tools(client_session: ClientSession) -> None:
     result = await client_session.list_tools()
 
     assert {tool.name for tool in result.tools} == {
+        "list_random_schools",
         "search_schools",
         "get_school_lunches",
     }
@@ -30,6 +31,16 @@ async def test_calls_school_search_tool(client_session: ClientSession) -> None:
     assert result.structuredContent is not None
     assert result.structuredContent["total"] == 1
     assert result.structuredContent["schools"][0]["school_code"] == "7010001"
+
+
+@pytest.mark.anyio
+async def test_calls_random_school_tool(client_session: ClientSession) -> None:
+    result = await client_session.call_tool("list_random_schools", {"count": 10})
+
+    assert result.isError is False
+    assert result.structuredContent is not None
+    assert result.structuredContent["total"] == 10
+    assert len(result.structuredContent["schools"]) == 10
 
 
 @pytest.mark.anyio

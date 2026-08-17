@@ -17,6 +17,11 @@ $TestMcpPort = if ($env:TEST_MCP_PORT) {
 } else {
     "18001"
 }
+$TestAgentPort = if ($env:TEST_AGENT_PORT) {
+    $env:TEST_AGENT_PORT
+} else {
+    "18002"
+}
 $OriginalEnvironment = @{
     NEIS_FIXTURE_MODE = $env:NEIS_FIXTURE_MODE
     NEIS_API_KEY = $env:NEIS_API_KEY
@@ -24,6 +29,8 @@ $OriginalEnvironment = @{
     BACKEND_PORT = $env:BACKEND_PORT
     E2E_BASE_URL = $env:E2E_BASE_URL
     MCP_PORT = $env:MCP_PORT
+    AGENT_PORT = $env:AGENT_PORT
+    AGENT_FIXTURE_MODE = $env:AGENT_FIXTURE_MODE
 }
 
 function Invoke-CheckedCommand {
@@ -70,12 +77,24 @@ try {
         Pop-Location
     }
 
+    Write-Host "==> 에이전트 앱 테스트"
+    Push-Location "src/agent"
+    try {
+        Invoke-CheckedCommand { uv sync --locked }
+        Invoke-CheckedCommand { uv run pytest }
+    }
+    finally {
+        Pop-Location
+    }
+
     Write-Host "==> E2E 테스트용 애플리케이션 시작"
     $env:NEIS_FIXTURE_MODE = "true"
     $env:NEIS_API_KEY = ""
     $env:FRONTEND_PORT = $TestFrontendPort
     $env:BACKEND_PORT = $TestBackendPort
     $env:MCP_PORT = $TestMcpPort
+    $env:AGENT_PORT = $TestAgentPort
+    $env:AGENT_FIXTURE_MODE = "true"
     Invoke-CheckedCommand {
         docker compose --project-name $ComposeProjectName up --build --detach `
             --wait --wait-timeout 120

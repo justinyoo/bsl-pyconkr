@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import type { SchoolSummary } from './api-client/client'
 import { isoToLocalDate } from './lib/dateRange'
-import { SiteHeader } from './components/SiteHeader'
+import { EvaluationAnalysis } from './components/EvaluationAnalysis'
+import { SiteHeader, type AppView } from './components/SiteHeader'
 import { SchoolSearchPage } from './pages/SchoolSearchPage'
 import { DateSelectionPage } from './pages/DateSelectionPage'
 import { MealResultsPage } from './pages/MealResultsPage'
@@ -14,6 +15,7 @@ interface SelectedRange {
 }
 
 function App() {
+  const [activeView, setActiveView] = useState<AppView>('lookup')
   const [step, setStep] = useState<Step>('school')
   const [school, setSchool] = useState<SchoolSummary | null>(null)
   const [range, setRange] = useState<SelectedRange | null>(null)
@@ -51,8 +53,11 @@ function App() {
 
   return (
     <div className="app-shell">
-      <SiteHeader />
-      <main className="app-main">
+      <SiteHeader activeView={activeView} onNavigate={setActiveView} />
+      {activeView === 'analysis' ? (
+        <EvaluationAnalysis />
+      ) : (
+        <main className="app-main">
         {step === 'school' ? (
           <SchoolSearchPage onSelect={handleSchoolSelect} />
         ) : null}
@@ -80,7 +85,8 @@ function App() {
             onChangeDates={handleDateChange}
           />
         ) : null}
-      </main>
+        </main>
+      )}
     </div>
   )
 }

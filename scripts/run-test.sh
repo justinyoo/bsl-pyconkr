@@ -8,6 +8,7 @@ COMPOSE_PROJECT_NAME="bsl-pyconkr-tests"
 TEST_FRONTEND_PORT="${TEST_FRONTEND_PORT:-15173}"
 TEST_BACKEND_PORT="${TEST_BACKEND_PORT:-18000}"
 TEST_MCP_PORT="${TEST_MCP_PORT:-18001}"
+TEST_AGENT_PORT="${TEST_AGENT_PORT:-18002}"
 
 cleanup() {
   docker compose --project-name "${COMPOSE_PROJECT_NAME}" down --volumes \
@@ -38,12 +39,21 @@ echo "==> MCP 서버 테스트"
   uv run pytest
 )
 
+echo "==> 에이전트 앱 테스트"
+(
+  cd src/agent
+  uv sync --locked
+  uv run pytest
+)
+
 echo "==> E2E 테스트용 애플리케이션 시작"
 export NEIS_FIXTURE_MODE=true
 export NEIS_API_KEY=
 export FRONTEND_PORT="${TEST_FRONTEND_PORT}"
 export BACKEND_PORT="${TEST_BACKEND_PORT}"
 export MCP_PORT="${TEST_MCP_PORT}"
+export AGENT_PORT="${TEST_AGENT_PORT}"
+export AGENT_FIXTURE_MODE=true
 docker compose --project-name "${COMPOSE_PROJECT_NAME}" up --build --detach \
   --wait --wait-timeout 120
 
