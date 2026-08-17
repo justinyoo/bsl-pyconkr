@@ -336,12 +336,27 @@ export function EvaluationAnalysis() {
           <h2>분석 진행 상황</h2>
           <ol>
             {STEPS.map((step) => (
-              <li className={steps[step.id] ?? ''} key={step.id}>
-                <span aria-hidden="true">
+              <li
+                aria-label={`${step.label}: ${
+                  steps[step.id] === 'done'
+                    ? '완료'
+                    : steps[step.id] === 'running'
+                      ? '진행 중'
+                      : '대기'
+                }`}
+                className={steps[step.id] ?? ''}
+                key={step.id}
+              >
+                <span
+                  className={
+                    steps[step.id] === 'running' ? 'progress-spinner' : ''
+                  }
+                  aria-hidden="true"
+                >
                   {steps[step.id] === 'done'
                     ? '✓'
                     : steps[step.id] === 'running'
-                      ? '●'
+                      ? ''
                       : '○'}
                 </span>
                 {step.label}

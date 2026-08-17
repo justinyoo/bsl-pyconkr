@@ -597,6 +597,29 @@ input {
   color: var(--color-primary);
 }
 
+.progress-spinner {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.1rem;
+  border: 0.18rem solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: analysis-spin 0.75s linear infinite;
+}
+
+@keyframes analysis-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progress-spinner {
+    border-right-color: currentColor;
+    animation: none;
+  }
+}
+
 .evaluation-results {
   margin-top: 2rem;
 }

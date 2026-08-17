@@ -178,4 +178,26 @@ describe('EvaluationAnalysis', () => {
     expect(screen.getByText('80.0점')).toBeInTheDocument()
     expect(screen.queryByText('60.0점')).not.toBeInTheDocument()
   })
+
+  it('shows an animated indicator for the running workflow step', async () => {
+    const user = userEvent.setup()
+    mocks.runEvaluation.mockImplementation(
+      async (
+        _request: unknown,
+        onProgress: (step: string, status: string) => void,
+      ) => {
+        onProgress('prepare', 'running')
+        return new Promise<BattleEvaluation>(() => {})
+      },
+    )
+    render(<EvaluationAnalysis />)
+
+    await screen.findAllByRole('checkbox')
+    await user.click(screen.getByText('예시학교1'))
+    await user.click(screen.getByText('예시학교2'))
+    await user.click(screen.getByRole('button', { name: '급식 배틀 시작' }))
+
+    const runningStep = await screen.findByLabelText('급식 데이터 준비: 진행 중')
+    expect(runningStep.querySelector('.progress-spinner')).toBeInTheDocument()
+  })
 })
