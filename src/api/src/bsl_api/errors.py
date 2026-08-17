@@ -112,16 +112,6 @@ class UpstreamUnavailableError(ApiError):
         )
 
 
-class InternalError(ApiError):
-    def __init__(self, detail: str = "예상하지 못한 오류가 발생했습니다.") -> None:
-        super().__init__(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            code="INTERNAL_ERROR",
-            title="Internal error",
-            detail=detail,
-        )
-
-
 def _problem_response(
     request: Request,
     *,

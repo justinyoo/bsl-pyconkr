@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
-from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 
 from bsl_api.api import health, meals, schools
-from bsl_api.errors import ApiError, register_exception_handlers
+from bsl_api.errors import register_exception_handlers
 from bsl_api.settings import get_settings
 
 API_PREFIX = "/api/v1"
@@ -39,5 +38,3 @@ def create_app() -> FastAPI:
 
 
 app = create_app()
-
-__all__ = ["app", "create_app", "ApiError", "RequestValidationError"]

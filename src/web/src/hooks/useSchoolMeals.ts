@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { getSchoolMeals } from '../api-client/client'
 
-export interface UseSchoolMealsParams {
+interface UseSchoolMealsParams {
   schoolCode: string
   officeCode: string
   from: string

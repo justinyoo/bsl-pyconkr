@@ -9,11 +9,9 @@
 import createClient from 'openapi-fetch'
 import type { components, paths } from './schema'
 
-export type ProblemDetail = components['schemas']['ProblemDetail']
+type ProblemDetail = components['schemas']['ProblemDetail']
 export type SchoolSummary = components['schemas']['SchoolSummary']
 export type Meal = components['schemas']['Meal']
-export type MealRangeResponse = components['schemas']['MealRangeResponse']
-export type SelectedSchool = components['schemas']['SelectedSchool']
 
 /** 백엔드가 반환한 `ProblemDetail` 오류를 감싸는 애플리케이션 예외. */
 export class ApiRequestError extends Error {
@@ -37,7 +35,7 @@ export class NetworkRequestError extends Error {
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? '/api/v1'
 
-export const client = createClient<paths>({
+const client = createClient<paths>({
   baseUrl,
   // openapi-fetch caches `globalThis.fetch` as a default parameter at
   // client-creation time. In tests, MSW patches `globalThis.fetch` only once
@@ -68,10 +66,6 @@ async function unwrap<T>(promise: Promise<{
   return result.data
 }
 
-export function checkHealth() {
-  return unwrap(client.GET('/health', {}))
-}
-
 export function searchSchools(name: string) {
   return unwrap(
     client.GET('/schools', {
@@ -80,7 +74,7 @@ export function searchSchools(name: string) {
   )
 }
 
-export interface GetSchoolMealsParams {
+interface GetSchoolMealsParams {
   schoolCode: string
   officeCode: string
   from: string

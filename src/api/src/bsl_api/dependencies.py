@@ -9,8 +9,6 @@ from bsl_api.clients.fixture_client import FixtureNeisClient
 from bsl_api.clients.neis_client import NeisClient
 from bsl_api.settings import get_settings
 
-__all__ = ["SchoolAndMealClient", "get_neis_client"]
-
 
 @lru_cache
 def get_neis_client() -> SchoolAndMealClient:
@@ -29,4 +27,3 @@ def get_neis_client() -> SchoolAndMealClient:
         api_key=settings.neis_api_key,
         timeout_seconds=settings.neis_timeout_seconds,
     )
-
