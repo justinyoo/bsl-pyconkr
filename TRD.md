@@ -3,16 +3,16 @@
 | 항목 | 내용 |
 | --- | --- |
 | 문서 상태 | 승인 (Approved) |
-| 버전 | 1.1 |
+| 버전 | 1.2 |
 | 제품명 | 급식 배틀 - 학교 급식 조회 앱 |
-| 기준 PRD | [`PRD.md` v1.0](./PRD.md) |
+| 기준 PRD | [`PRD.md` v1.1](./PRD.md) |
 | 작성자 | 프로젝트 팀 |
 | 작성일 | 2026-08-17 |
 | 최종 수정일 | 2026-08-17 |
 | 대상 릴리스 | MVP |
-| 관련 이슈 | [GitHub Issue #4](https://github.com/justinyoo/bsl-pyconkr/issues/4) |
+| 관련 이슈 | [GitHub Issue #4](https://github.com/justinyoo/bsl-pyconkr/issues/4), [GitHub Issue #5](https://github.com/justinyoo/bsl-pyconkr/issues/5) |
 | 외부 API 명세 | [`data/openapi.json`](./data/openapi.json) |
-| 내부 API 명세 | `src/openapi.json` (구현 단계에서 본 문서의 계약으로 생성) |
+| 내부 API 명세 | [`src/openapi.json`](./src/openapi.json) |
 
 ### 변경 이력
 
@@ -21,12 +21,14 @@
 | 0.1 | 2026-08-17 | 최초 기술 설계, 내부 API 계약 및 테스트 전략 작성 | 프로젝트 팀 |
 | 1.0 | 2026-08-17 | 기술 설계 검토 완료 및 승인 | 프로젝트 팀 |
 | 1.1 | 2026-08-17 | Python 패키지 관리와 애플리케이션 실행 도구를 `uv`로 명시 | 프로젝트 팀 |
+| 1.2 | 2026-08-17 | 구현 결과에 맞춰 단일 URL 상태, 저장소 구조, 실행 스크립트, 로깅 및 테스트 현황 반영 | 프로젝트 팀 |
 
 ## 1. 문서 목적
 
 이 문서는 승인된 `PRD.md`를 구현하기 위한 기술 구조와 책임을 정의한다.
-애플리케이션은 React 기반 프론트엔드와 Python 기반 백엔드로 구성하며, 두
-서비스는 Docker Compose로 함께 실행한다.
+애플리케이션은 React 기반 프론트엔드와 Python 기반 백엔드로 구성한다. 로컬
+개발에서는 통합 스크립트가 두 개발 서버를 직접 실행하고, 컨테이너 통합 검증과
+배포 형태의 실행에는 Docker Compose를 사용한다.
 
 외부 NEIS 계약과 내부 애플리케이션 계약은 다음과 같이 분리한다.
 
@@ -55,12 +57,12 @@
 - 사용자 인증과 데이터베이스는 MVP 범위에 포함하지 않는다.
 - 프론트엔드에서 NEIS 호스트 또는 API 키로 직접 요청해서는 안 된다.
 
-## 3. 권장 기술 스택
+## 3. 기술 스택
 
 | 영역 | 선택 | 선정 이유 |
 | --- | --- | --- |
 | 프론트엔드 | React, TypeScript, Vite | 빠른 개발 환경, 엄격한 타입, 기존 CI의 TypeScript 구성과 일치 |
-| 라우팅 | React Router | 검색, 날짜 선택, 결과 화면의 경로와 탐색 상태 관리 |
+| 화면 상태 | 단일 `/` URL과 React 컴포넌트 상태 | 검색 조건을 주소에 노출하지 않고 세 단계 흐름 관리 |
 | 서버 상태 | TanStack Query | 검색 debounce 이후 요청, 캐시, 로딩·오류·재시도 상태 관리 |
 | Date Picker | React DayPicker 기반 범위 선택 컴포넌트 | 접근 가능한 키보드 탐색과 날짜 범위 선택 지원 |
 | 스타일 | CSS Modules 또는 전역 디자인 토큰 | Bento Grid와 네오 브루탈리즘을 불필요한 UI 프레임워크 종속 없이 구현 |
@@ -68,7 +70,7 @@
 | 외부 HTTP | HTTPX | 비동기 요청, 타임아웃, 테스트 대체가 용이 |
 | Python 실행 | Python 3.12, `uv run` | 가상 환경을 직접 활성화하지 않고 잠긴 환경에서 명령 실행 |
 | 패키지 관리 | npm, Python `uv` + `pyproject.toml` + `uv.lock` | 재현 가능한 의존성 해석과 로컬·CI·컨테이너 환경의 일관성 보장 |
-| 오케스트레이션 | Docker Compose | 프론트엔드와 백엔드를 단일 명령으로 빌드·실행 |
+| 오케스트레이션 | Bash/PowerShell 통합 스크립트, Docker Compose | 로컬 직접 실행과 컨테이너 통합 검증을 각각 재현 가능하게 제공 |
 
 React DayPicker는 화면에 직접 노출되는 제품 컴포넌트가 아니라 Date Picker를
 구성하는 기반 라이브러리로 사용한다. 앱 전용 래퍼에서 한국어 레이블, 유효 범위,
@@ -112,9 +114,11 @@ flowchart LR
 - 300ms debounce 후 공백 제거 기준 2자 이상일 때 검색 요청
 - Date Picker의 기본 범위를 오늘의 7일 전부터 오늘까지로 설정
 - 직전 달 1일보다 이전이거나 오늘보다 이후인 날짜 및 역순 범위 차단
+- 선택 범위 요약·초기화와 결과 화면의 학교·날짜 재선택 제공
 - 내부 OpenAPI 명세에서 생성한 타입 안전 클라이언트로만 백엔드 호출
-- 로딩, 빈 결과, 유효성 오류와 네트워크 오류 표시
+- 로딩, 빈 결과, 유효성 오류, 네트워크 오류와 명시적인 재시도 동작 표시
 - 백엔드가 반환하지 않은 날짜를 선택 범위 내에서 계산해 빈 카드 표시
+- 제공된 원산지, 영양 정보, 칼로리와 급식 인원을 날짜별 카드에 표시
 - Bento Grid + 네오 브루탈리즘 스타일과 반응형·접근성 요구사항 구현
 
 ### 5.2 백엔드 API
@@ -150,12 +154,14 @@ flowchart LR
 ├── src/
 │   ├── web/                 # React 프론트엔드 앱
 │   │   ├── src/
-│   │   │   ├── api/         # 생성 클라이언트와 API 어댑터
+│   │   │   ├── api-client/  # OpenAPI 생성 타입과 API 어댑터
 │   │   │   ├── components/  # Search, DatePicker, MealCard
+│   │   │   ├── hooks/       # TanStack Query와 UI 훅
+│   │   │   ├── lib/         # 날짜 정책과 누락 날짜 계산
 │   │   │   ├── pages/       # 학교 검색, 날짜 선택, 결과
-│   │   │   ├── styles/      # 디자인 토큰과 공통 스타일
-│   │   │   └── test/        # 테스트 설정과 MSW 핸들러
-│   │   ├── tests/           # 프론트엔드 통합 테스트
+│   │   │   ├── test/        # 테스트 설정과 MSW 핸들러
+│   │   │   ├── App.tsx      # 단일 URL 단계와 선택 상태
+│   │   │   └── index.css    # 디자인 토큰과 공통 스타일
 │   │   ├── Dockerfile
 │   │   └── package.json
 │   ├── api/                 # FastAPI 백엔드 앱
@@ -164,6 +170,7 @@ flowchart LR
 │   │   │   ├── clients/     # NEIS 클라이언트
 │   │   │   ├── models/      # 내부 요청·응답 모델
 │   │   │   ├── services/    # 조회와 변환 로직
+│   │   │   ├── middleware.py # 요청 ID와 요청 완료 로그
 │   │   │   └── settings.py
 │   │   ├── tests/
 │   │   │   ├── unit/
@@ -173,6 +180,7 @@ flowchart LR
 │   │   └── uv.lock
 │   ├── e2e/                 # Playwright E2E 프로젝트
 │   └── openapi.json         # 프론트엔드-백엔드 내부 계약
+├── scripts/                 # Bash/PowerShell 실행·전체 테스트 스크립트
 ├── data/
 │   └── openapi.json         # NEIS 외부 계약
 └── compose.yml
@@ -364,7 +372,7 @@ Accept: application/json
 
 ### 7.7 내부 OpenAPI 핵심 구조
 
-구현 단계의 `src/openapi.json`은 최소한 다음 계약을 포함해야 한다.
+현재 `src/openapi.json`은 다음 경로와 Payload 구조를 포함한다.
 
 ```yaml
 openapi: 3.0.4
@@ -372,7 +380,7 @@ info:
   title: Battle School Lunch API
   version: 1.0.0
 paths:
-  /api/v1/health:
+  /health:
     get:
       operationId: getHealth
       responses:
@@ -381,7 +389,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthResponse"
-  /api/v1/schools:
+  /schools:
     get:
       operationId: searchSchools
       parameters:
@@ -398,7 +406,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/SchoolSearchResponse"
-  /api/v1/schools/{schoolCode}/meals:
+  /schools/{schoolCode}/meals:
     get:
       operationId: getSchoolMeals
       parameters:
@@ -576,7 +584,7 @@ components:
 ```
 
 전체 `src/openapi.json`에는 각 응답의 `ProblemDetail`, 예제, 설명과 모든 상태
-코드를 포함한다. 위 YAML은 구현해야 할 경로와 Payload의 최소 구조를 나타낸다.
+코드를 포함한다. 위 YAML은 구현된 경로와 Payload의 핵심 구조를 요약한다.
 
 ## 8. 외부 NEIS 연동
 
@@ -601,31 +609,34 @@ components:
 | `origins` | `ORPLC_INFO` | `<br/>` 계열 구분자를 배열로 분리 |
 | `nutrition` | `NTR_INFO` | `<br/>` 계열 구분자를 배열로 분리 |
 | `calories` | `CAL_INFO` | 공백 제거, 미제공 시 `null` |
-| `servingCount` | `MLSV_FGR` | 정수 변환, 미제공·변환 불가 시 `null` |
+| `servingCount` | `MLSV_FGR` | 문자열·정수·정수값 실수를 정수로 변환, 미제공·변환 불가 시 `null` |
 
 HTML 구분자는 `<br>`, `<br/>`, `<br />`와 대소문자 차이를 모두 처리한다. 메뉴
 문자열의 알레르기 번호 표기는 원본 정보 보존을 위해 임의로 제거하지 않는다.
 
 ## 9. 프론트엔드 설계
 
-### 9.1 화면 경로
+### 9.1 화면 경로와 단계
 
-| 경로 | 화면 | 책임 |
+프론트엔드는 `/` 단일 경로에서 다음 세 단계를 조건부 렌더링한다.
+
+| 단계 | 화면 | 책임 |
 | --- | --- | --- |
-| `/` | 학교 검색 | 검색 입력, 결과, 학교 선택 |
-| `/schools/:schoolCode/dates` | 날짜 선택 | 학교 요약, Date Picker, 범위 검증 |
-| `/schools/:schoolCode/meals` | 급식 결과 | 조회 조건, 날짜별 카드, 빈 날짜 |
+| 학교 검색 | 학교 검색 | 검색 입력, 결과, 학교 선택 |
+| 날짜 선택 | 날짜 선택 | 학교 요약, Date Picker, 범위 검증·초기화 |
+| 급식 결과 | 급식 결과 | 조회 조건, 부가 급식 정보, 날짜별 카드, 빈 날짜 |
 
-교육청 코드와 날짜 범위는 URL query로 유지해 새로고침과 뒤로 가기 동작을
-보존한다. URL에서 읽은 값은 API 호출 전에 다시 검증한다.
+다른 경로로 접근하면 `/`로 정규화한다. 교육청 코드와 날짜 범위를 path 또는
+query parameter에 노출하지 않으며, 결과 화면에서 학교 또는 날짜 선택 단계로
+명시적으로 돌아갈 수 있다.
 
 ### 9.2 상태 관리
 
 - 서버 응답은 TanStack Query가 관리한다.
-- 현재 검색어, 선택 날짜와 UI 열림 상태는 컴포넌트 또는 페이지 상태로 관리한다.
+- `App.tsx`가 선택 학교, 날짜 범위와 현재 단계의 상태 원본이다.
+- 현재 검색어와 Date Picker 임시 범위는 각 페이지 상태로 관리한다.
 - 전역 상태 라이브러리는 MVP에서 도입하지 않는다.
-- 학교 선택과 날짜는 경로 및 query parameter를 공유 가능한 상태 원본으로
-  사용한다.
+- 화면을 이전 단계로 전환할 때 이미 확정한 날짜 범위는 유지한다.
 
 ### 9.3 Date Picker
 
@@ -634,6 +645,7 @@ HTML 구분자는 `<br>`, `<br/>`, `<br />`와 대소문자 차이를 모두 처
 - 시작일, 범위 중간과 종료일에 서로 구분되는 스타일을 적용한다.
 - 직전 달 1일 이전과 오늘 이후 날짜는 선택할 수 없게 비활성화한다.
 - 종료일이 시작일보다 빠른 범위는 오류를 표시하고 조회 버튼을 비활성화한다.
+- 선택 범위를 텍스트로 요약하고 초기화 버튼으로 전체 선택을 지울 수 있다.
 - 날짜 셀, 이전·다음 달 버튼과 범위 안내에 접근 가능한 이름을 제공한다.
 - 모바일에서는 한 달, 충분한 너비에서는 두 달 표시를 허용한다.
 
@@ -646,6 +658,7 @@ HTML 구분자는 `<br>`, `<br/>`, `<br />`와 대소문자 차이를 모두 처
 - **NEIS Client:** 외부 HTTP와 NEIS 전용 응답 파싱
 - **Models:** Pydantic 요청·응답 계약
 - **Settings:** 환경 변수 검증
+- **Middleware:** 요청 ID 부여와 완료 상태 로깅
 
 라우터에서 직접 외부 API를 호출하지 않는다. 서비스는 HTTP 구현이 아니라
 NEIS 클라이언트 인터페이스에 의존해 단위 테스트에서 교체할 수 있어야 한다.
@@ -654,21 +667,23 @@ NEIS 클라이언트 인터페이스에 의존해 단위 테스트에서 교체�
 
 | 변수 | 필수 | 기본값 | 설명 |
 | --- | --- | --- | --- |
-| `NEIS_API_KEY` | 예 | 없음 | NEIS 인증키 |
+| `NEIS_API_KEY` | 조건부 | 없음 | fixture 모드가 아닐 때 필요한 NEIS 인증키 |
 | `NEIS_BASE_URL` | 아니요 | `https://open.neis.go.kr` | 테스트 및 운영 호스트 |
 | `NEIS_TIMEOUT_SECONDS` | 아니요 | `15` | 외부 요청 전체 타임아웃 |
+| `NEIS_FIXTURE_MODE` | 아니요 | `false` | 로컬 데모와 E2E용 고정 응답 모드 |
 | `CORS_ALLOWED_ORIGINS` | 아니요 | 로컬 프론트엔드 origin | 쉼표 구분 허용 origin |
-| `LOG_LEVEL` | 아니요 | `INFO` | 애플리케이션 로그 수준 |
+| `LOG_LEVEL` | 아니요 | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` 중 애플리케이션 로그 수준 |
 
 애플리케이션 시작 시 필수 설정을 검증한다. 누락된 API 키를 요청 시점까지 숨기지
 않고 명확한 시작 오류로 처리한다.
 
 ### 10.3 오류 및 로깅
 
-- 외부 타임아웃과 연결 오류를 구분해 기록한다.
+- 외부 타임아웃, 연결 실패와 그 밖의 HTTP 오류를 구분해 경로만 기록한다.
 - 사용자 입력 오류는 `400`, 존재하지 않는 학교는 `404`로 응답한다.
 - NEIS 오류 응답은 코드에 따라 `429`, `502`, `503`으로 매핑한다.
-- 요청마다 상관관계 ID를 생성하거나 전달받아 로그에 포함한다.
+- 유효한 `X-Request-ID`를 전달받거나 UUID를 생성해 응답 헤더와 완료 로그에
+  포함한다.
 - API 키, 전체 query string과 민감 헤더를 로그에 기록하지 않는다.
 - 광범위한 예외를 성공 응답이나 빈 목록으로 바꾸지 않는다.
 
@@ -703,7 +718,20 @@ uv run fastapi run src/bsl_api/main.py --host 0.0.0.0 --port 8000
 경계를 사용한다. `pyproject.toml`의 `[project.requires-python]`은 Python 3.12
 호환 범위를 선언하고 `.python-version`을 추가하는 경우 `3.12`로 고정한다.
 
-## 11. Docker Compose
+## 11. 통합 실행 스크립트와 Docker Compose
+
+### 11.1 로컬 직접 실행
+
+저장소 루트의 `scripts/run-app.sh`와 `scripts/run-app.ps1`은 Docker를 거치지
+않고 `uv run fastapi dev`와 `npm run dev`를 함께 실행한다. 한 프로세스가
+종료되거나 사용자가 `Ctrl+C`를 입력하면 남은 프론트엔드·백엔드 프로세스 트리도
+종료한다. 루트 `.env` 값은 이미 설정된 프로세스 환경 변수를 덮어쓰지 않는다.
+
+`scripts/run-test.sh`와 `scripts/run-test.ps1`은 백엔드 pytest, 프론트엔드
+Vitest, fixture Compose 스택의 Playwright E2E를 순차 실행하고 종료 시 스택을
+정리한다.
+
+### 11.2 Docker Compose
 
 Compose는 최소 두 서비스를 제공한다.
 
@@ -722,9 +750,9 @@ Compose는 최소 두 서비스를 제공한다.
 - backend 컨테이너는 `uv run fastapi run src/bsl_api/main.py --host 0.0.0.0
   --port 8000`을 실행하며 개발용 reload를 사용하지 않는다.
 
-## 12. 테스트 전략과 권장 프레임워크
+## 12. 테스트 전략과 프레임워크
 
-### 12.1 권장 조합
+### 12.1 적용 조합
 
 | 범위 | 프레임워크 | 추천 이유 |
 | --- | --- | --- |
@@ -733,7 +761,7 @@ Compose는 최소 두 서비스를 제공한다.
 | 백엔드 통합 | **pytest + FastAPI TestClient/HTTPX + respx** | 실제 라우팅·검증을 실행하면서 NEIS HTTP 경계를 결정적으로 대체 |
 | E2E | **Playwright** | Chromium 기반 실제 브라우저에서 Date Picker와 반응형 흐름 검증 가능 |
 
-이 조합을 우선 추천한다. Jest는 Vite 환경에서 Vitest와 역할이 중복되고,
+이 조합을 사용한다. Jest는 Vite 환경에서 Vitest와 역할이 중복되고,
 Cypress는 E2E 도구를 둘로 나눌 이유가 없으므로 MVP에는 함께 도입하지 않는다.
 
 ### 12.2 프론트엔드 통합 테스트
@@ -745,8 +773,9 @@ PRD와 이슈 조건에 따라 별도의 세부 단위 테스트보다 사용자
 - 검색 결과 없음과 조회 실패 상태가 구분됨
 - 학교 선택 후 날짜 화면으로 이동함
 - Date Picker 기본 범위가 오늘의 7일 전부터 오늘까지임
+- Date Picker 범위를 초기화하면 조회가 차단됨
 - 역순 또는 직전 달 1일~오늘을 벗어난 범위에서 조회가 차단됨
-- 급식 응답과 누락 날짜가 각각 결과 카드와 빈 카드로 표시됨
+- 급식 메뉴·부가 정보와 누락 날짜가 각각 결과 카드와 빈 카드로 표시됨
 - 키보드로 학교 카드와 날짜를 선택할 수 있음
 
 MSW 응답은 `src/openapi.json`의 예제와 스키마를 기준으로 작성한다.
@@ -757,7 +786,7 @@ MSW 응답은 `src/openapi.json`의 예제와 스키마를 기준으로 작성�
 - `YYYYMMDD`와 ISO 날짜 변환
 - `<br>` 변형의 배열 분리
 - 빈 선택 항목 제거와 정렬
-- `MLSV_FGR`의 정수 및 `null` 변환
+- `MLSV_FGR`의 문자열·정수·실수 입력과 `null` 변환
 - NEIS 코드별 내부 예외 매핑
 
 단위 테스트는 네트워크를 사용하지 않는다.
@@ -770,6 +799,7 @@ MSW 응답은 `src/openapi.json`의 예제와 스키마를 기준으로 작성�
 - NEIS `INFO-200`이 빈 배열의 `200` 응답으로 변환됨
 - NEIS 인증·제한·장애 오류가 정의된 상태 코드로 변환됨
 - API 키가 응답 또는 로그에 노출되지 않음
+- 유효하거나 잘못된 `X-Request-ID`의 전달·생성 및 완료 로그 포함
 
 `respx`로 HTTPX의 NEIS 호출만 대체하고 FastAPI 앱과 실제 라우팅·Pydantic
 검증은 실행한다.
@@ -783,7 +813,8 @@ Docker Compose로 전체 서비스를 실행한 뒤 Playwright에서 다음 핵�
 2. 검색 결과에서 학교 선택
 3. Date Picker로 유효 범위 선택
 4. 급식 조회
-5. 날짜별 메뉴와 급식 없음 카드 확인
+5. 날짜별 메뉴·부가 정보와 급식 없음 카드 확인
+6. 학교·날짜 다시 선택과 날짜 범위 초기화
 
 추가로 모바일 viewport에서 가로 스크롤 없이 흐름이 완료되는지, 키보드
 탐색으로 주요 행동을 수행할 수 있는지 검증한다. E2E는 NEIS의 가용성에
@@ -818,25 +849,26 @@ CI 작업 디렉터리는 프론트엔드 `src/web/`, 백엔드 `src/api/`, E2E
 | PRD 요구사항 | 기술 구성 |
 | --- | --- |
 | FR-01~06 학교 검색·선택 | 학교 검색 endpoint, React 검색 통합, NEIS 학교 매핑 |
-| FR-07~12 날짜 선택 | React DayPicker 래퍼, URL query, 프론트·백엔드 이중 검증 |
-| FR-13~19 급식 결과 | 중식 endpoint, NEIS 급식 매핑, 날짜별 Bento 카드 |
-| FR-20~25 상태·오류 | TanStack Query 상태, `ProblemDetail`, 외부 오류 매핑 |
+| FR-07~12 날짜 선택 | React DayPicker 래퍼, 내부 단계 상태, 범위 요약·초기화, 프론트·백엔드 이중 검증 |
+| FR-13~19 급식 결과 | 중식 endpoint, NEIS 급식 매핑, 부가 정보와 날짜별 Bento 카드, 재선택 |
+| FR-20~25 상태·오류 | TanStack Query 상태·재시도, `ProblemDetail`, 외부 오류 매핑 |
 | UI·반응형·접근성 | 디자인 토큰, CSS Grid, Date Picker 키보드 지원, Playwright |
 
 ## 15. 구현 인수 조건
 
-- [ ] React 프론트엔드가 NEIS API를 직접 호출하지 않는다.
-- [ ] Python 백엔드가 `data/openapi.json` 계약에 따라 NEIS를 호출한다.
-- [ ] `src/openapi.json`에 본 문서의 세 endpoint와 모든 Payload 스키마가
+- [x] React 프론트엔드가 NEIS API를 직접 호출하지 않는다.
+- [x] Python 백엔드가 `data/openapi.json` 계약에 따라 NEIS를 호출한다.
+- [x] `src/openapi.json`에 본 문서의 세 endpoint와 모든 Payload 스키마가
       정의되어 있다.
-- [ ] 프론트엔드 API 타입과 클라이언트가 `src/openapi.json`에서 생성된다.
-- [ ] 학교 검색과 중식 응답이 외부 NEIS 필드에서 내부 모델로 정규화된다.
-- [ ] 역순 또는 직전 달 1일~오늘을 벗어난 날짜 범위를 프론트엔드와 백엔드
+- [x] 프론트엔드 API 타입이 `src/openapi.json`에서 생성되고 클라이언트가 이를
+      사용한다.
+- [x] 학교 검색과 중식 응답이 외부 NEIS 필드에서 내부 모델로 정규화된다.
+- [x] 역순 또는 직전 달 1일~오늘을 벗어난 날짜 범위를 프론트엔드와 백엔드
       모두 거부한다.
-- [ ] 중식 조회에 `MMEAL_SC_CODE=2`가 강제된다.
-- [ ] `NEIS_API_KEY`가 백엔드 외부에 노출되지 않는다.
-- [ ] Python 의존성이 `pyproject.toml`과 커밋된 `uv.lock`으로 관리되며 로컬,
+- [x] 중식 조회에 `MMEAL_SC_CODE=2`가 강제된다.
+- [x] `NEIS_API_KEY`가 백엔드 외부에 노출되지 않는다.
+- [x] Python 의존성이 `pyproject.toml`과 커밋된 `uv.lock`으로 관리되며 로컬,
       CI와 컨테이너에서 `uv sync --locked` 및 `uv run`을 사용한다.
-- [ ] 프론트엔드 통합 테스트, 백엔드 단위·통합 테스트와 Playwright E2E가
+- [x] 프론트엔드 통합 테스트, 백엔드 단위·통합 테스트와 Playwright E2E가
       핵심 사용자 흐름을 검증한다.
-- [ ] Docker Compose로 프론트엔드와 백엔드를 함께 빌드하고 실행할 수 있다.
+- [x] Docker Compose로 프론트엔드와 백엔드를 함께 빌드하고 실행할 수 있다.
