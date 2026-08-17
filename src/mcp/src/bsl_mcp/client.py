@@ -269,6 +269,8 @@ class FixtureNeisClient:
             school_code=school_code,
         ):
             return []
+        if school_code == "7010010":
+            return []
         start = datetime.strptime(from_ymd, "%Y%m%d").date()
         end = datetime.strptime(to_ymd, "%Y%m%d").date()
         rows: list[dict[str, Any]] = []

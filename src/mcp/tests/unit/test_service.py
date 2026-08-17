@@ -7,7 +7,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from bsl_mcp.client import FixtureNeisClient
-from bsl_mcp.exceptions import SchoolNotFoundError
+from bsl_mcp.exceptions import MealsNotFoundError, SchoolNotFoundError
 from bsl_mcp.service import get_school_lunches, list_random_schools, search_schools
 
 
@@ -63,6 +63,20 @@ async def test_get_school_lunches_normalizes_and_sorts_meals() -> None:
     assert [meal.date for meal in result.meals] == [yesterday, today]
     assert result.meals[0].dishes == ["현미밥", "된장찌개", "제육볶음"]
     assert result.meals[0].serving_count == 450
+
+
+@pytest.mark.anyio
+async def test_fixture_school_without_meals_reports_no_data() -> None:
+    today = datetime.now(tz=ZoneInfo("Asia/Seoul")).date()
+
+    with pytest.raises(MealsNotFoundError):
+        await get_school_lunches(
+            FixtureNeisClient(),
+            education_office_code="B10",
+            school_code="7010010",
+            from_date=today,
+            to_date=today,
+        )
 
 
 @pytest.mark.anyio

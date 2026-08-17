@@ -77,7 +77,10 @@ class EvaluationRequest(ApiModel):
 
 class EvaluationContext(ApiModel):
     request: EvaluationRequest
-    meals: Annotated[list[SchoolMealsResult], Field(min_length=2, max_length=2)]
+    meals: Annotated[list[SchoolMealsResult], Field(min_length=1, max_length=2)]
+    unavailable_schools: Annotated[list[School], Field(max_length=1)] = Field(
+        default_factory=list
+    )
 
 
 CriterionId = Literal["nutrition_balance", "healthiness", "menu_quality"]
@@ -94,7 +97,7 @@ class SchoolCriterionEvaluation(ApiModel):
 class CriterionEvaluation(ApiModel):
     criterion: CriterionId
     evaluations: Annotated[
-        list[SchoolCriterionEvaluation], Field(min_length=2, max_length=2)
+        list[SchoolCriterionEvaluation], Field(min_length=1, max_length=2)
     ]
 
 
@@ -116,12 +119,12 @@ class SchoolScore(ApiModel):
     total_score: float
 
 
-Outcome = Literal["first", "second", "tie"]
+Outcome = Literal["first", "second", "tie", "incomplete"]
 
 
 class ScoredEvaluation(ApiModel):
     date: date
-    school_scores: Annotated[list[SchoolScore], Field(min_length=2, max_length=2)]
+    school_scores: Annotated[list[SchoolScore], Field(min_length=1, max_length=2)]
     outcome: Outcome
 
 
@@ -134,7 +137,8 @@ class FinalNarrative(ApiModel):
 
 class BattleEvaluation(ApiModel):
     date: date
-    school_scores: Annotated[list[SchoolScore], Field(min_length=2, max_length=2)]
+    school_scores: Annotated[list[SchoolScore], Field(min_length=1, max_length=2)]
+    unavailable_schools: Annotated[list[School], Field(max_length=1)]
     outcome: Outcome
     winner_school_code: str | None
     summary: str

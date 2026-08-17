@@ -41,7 +41,7 @@ function defaultPrompt(
 
 function ResultPanel({ result }: { result: BattleEvaluation }) {
   const winner =
-    result.outcome === 'tie'
+    result.outcome === 'tie' || result.outcome === 'incomplete'
       ? null
       : result.schoolScores.find(
           (score) => score.school.schoolCode === result.winnerSchoolCode,
@@ -52,12 +52,31 @@ function ResultPanel({ result }: { result: BattleEvaluation }) {
       <div className="winner-card">
         <p className="section-kicker">최종 판정</p>
         <h2>
-          {winner ? `${winner.school.schoolName} 승리` : '두 학교가 동점입니다'}
+          {result.outcome === 'incomplete'
+            ? '급식 정보 부족으로 승패를 보류합니다'
+            : winner
+              ? `${winner.school.schoolName} 승리`
+              : '두 학교가 동점입니다'}
         </h2>
         <p>{result.summary}</p>
       </div>
 
       <div className="score-grid">
+        {result.unavailableSchools.map((school) => (
+          <article
+            className="school-score-card unavailable-school-card"
+            key={school.schoolCode}
+          >
+            <header>
+              <p>{school.educationOfficeName}</p>
+              <h3>{school.schoolName}</h3>
+              <strong>분석 불가</strong>
+            </header>
+            <p>
+              선택한 날짜의 중식 정보가 없어 이 학교는 분석할 수 없습니다.
+            </p>
+          </article>
+        ))}
         {result.schoolScores.map((score) => (
           <article className="school-score-card" key={score.school.schoolCode}>
             <header>

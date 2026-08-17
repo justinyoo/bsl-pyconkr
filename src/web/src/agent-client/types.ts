@@ -25,8 +25,9 @@ export interface SchoolScore {
 
 export interface BattleEvaluation {
   date: string
-  schoolScores: [SchoolScore, SchoolScore]
-  outcome: 'first' | 'second' | 'tie'
+  schoolScores: SchoolScore[]
+  unavailableSchools: EvaluationSchool[]
+  outcome: 'first' | 'second' | 'tie' | 'incomplete'
   winnerSchoolCode: string | null
   summary: string
   keyReasons: string[]

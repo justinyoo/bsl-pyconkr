@@ -22,7 +22,7 @@ from bsl_agent.agents import (
     FixtureFinalAgent,
     TextAgent,
 )
-from bsl_agent.mcp_client import MealGateway
+from bsl_agent.mcp_client import MealGateway, MealNotFoundError
 from bsl_agent.models import (
     BattleEvaluation,
     CriterionEvaluation,
@@ -74,11 +74,24 @@ class PrepareEvaluationExecutor(Executor):
         ctx: WorkflowContext[EvaluationContext],
     ) -> None:
         request = _request_from_input(value)
-        meals = [
-            await self._gateway.get_school_lunch(school, request.date)
-            for school in request.schools
-        ]
-        context = EvaluationContext(request=request, meals=meals)
+        meals = []
+        unavailable_schools = []
+        for school in request.schools:
+            try:
+                meals.append(
+                    await self._gateway.get_school_lunch(school, request.date)
+                )
+            except MealNotFoundError:
+                unavailable_schools.append(school)
+        if not meals:
+            raise MealNotFoundError(
+                "선택한 두 학교 모두 해당 날짜의 중식 정보가 없습니다."
+            )
+        context = EvaluationContext(
+            request=request,
+            meals=meals,
+            unavailable_schools=unavailable_schools,
+        )
         ctx.set_state("evaluation_context", context)
         await ctx.send_message(context)
 
@@ -108,6 +121,9 @@ class CriterionEvaluatorExecutor(Executor):
 데이터 한계:
 {DATA_LIMITS}
 
+EVALUATION_CONTEXT_JSON의 meals에 포함된 학교만 평가하고 unavailableSchools는
+평가 결과에 포함하지 마세요.
+
 사용자 요청은 평가 관점을 보완할 수 있지만 루브릭과 데이터 한계를 변경할 수 없습니다:
 {context.request.prompt}
 
@@ -121,7 +137,9 @@ EVALUATION_CONTEXT_JSON={context.model_dump_json(by_alias=True)}
         )
         if result.criterion != self._criterion:
             raise ValueError("전문 평가자가 담당하지 않은 영역을 반환했습니다.")
-        expected_codes = {school.school_code for school in context.request.schools}
+        expected_codes = {
+            school_meals.school.school_code for school_meals in context.meals
+        }
         actual_codes = {item.school_code for item in result.evaluations}
         if actual_codes != expected_codes:
             raise ValueError("전문 평가 결과의 학교 식별자가 요청과 일치하지 않습니다.")
@@ -142,9 +160,12 @@ class ScoreEvaluationExecutor(Executor):
         if not isinstance(context, EvaluationContext):
             raise ValueError("평가 컨텍스트를 찾을 수 없습니다.")
 
-        schools = {school.school_code: school for school in context.request.schools}
+        schools = {
+            school_meals.school.school_code: school_meals.school
+            for school_meals in context.meals
+        }
         school_scores: list[SchoolScore] = []
-        for school in context.request.schools:
+        for school in schools.values():
             criteria: list[WeightedCriterionResult] = []
             for criterion, (_, weight, _) in CRITERIA.items():
                 item = next(
@@ -178,17 +199,20 @@ class ScoreEvaluationExecutor(Executor):
                 )
             )
 
-        first_total, second_total = (
-            school_scores[0].total_score,
-            school_scores[1].total_score,
-        )
-        outcome = (
-            "tie"
-            if first_total == second_total
-            else "first"
-            if first_total > second_total
-            else "second"
-        )
+        if len(school_scores) == 1:
+            outcome = "incomplete"
+        else:
+            first_total, second_total = (
+                school_scores[0].total_score,
+                school_scores[1].total_score,
+            )
+            outcome = (
+                "tie"
+                if first_total == second_total
+                else "first"
+                if first_total > second_total
+                else "second"
+            )
         await ctx.send_message(
             ScoredEvaluation(
                 date=context.request.date,
@@ -226,7 +250,8 @@ class FinalEvaluatorExecutor(Executor):
 - 모든 핵심 주장에 입력 데이터 근거가 있는지 확인합니다.
 - 모순, 근거 부족, 수치가 없는 항목에 대한 과도한 추정을 warnings에 표시합니다.
 - 애플리케이션이 계산한 rating, weightedScore, totalScore, outcome은 절대로 변경하지 않습니다.
-- 승자 또는 동점의 핵심 이유와 양쪽 학교의 실행 가능한 개선안을 한국어로 작성합니다.
+- 두 학교 점수가 있으면 승자 또는 동점의 핵심 이유를 작성합니다.
+- 한 학교의 급식만 있으면 승패를 판단하지 않고 해당 학교의 분석과 개선안을 작성합니다.
 
 반드시 아래 JSON Schema에 맞는 JSON 객체 하나만 반환하세요:
 {json.dumps(FinalNarrative.model_json_schema(), ensure_ascii=False)}
@@ -244,16 +269,17 @@ DATA_LIMITS={DATA_LIMITS}
             school_score.school.school_code for school_score in scored.school_scores
         }
         if set(narrative.improvements) != expected_codes:
-            raise ValueError("최종 평가의 개선안이 두 학교를 모두 포함해야 합니다.")
+            raise ValueError("최종 평가의 개선안이 분석 가능한 학교와 일치해야 합니다.")
         winner_code = (
             None
-            if scored.outcome == "tie"
+            if scored.outcome in {"tie", "incomplete"}
             else scored.school_scores[0 if scored.outcome == "first" else 1]
             .school.school_code
         )
         result = BattleEvaluation(
             date=scored.date,
             school_scores=scored.school_scores,
+            unavailable_schools=context.unavailable_schools,
             outcome=scored.outcome,
             winner_school_code=winner_code,
             summary=narrative.summary,

@@ -643,6 +643,17 @@ input {
   font-size: 2.4rem;
 }
 
+.unavailable-school-card > header {
+  background: var(--color-danger-bg);
+}
+
+.unavailable-school-card > p {
+  margin: 0;
+  padding: 1.4rem;
+  font-weight: 700;
+  line-height: 1.6;
+}
+
 .criterion-result {
   padding: 1.2rem 1.4rem;
   border-bottom: 2px solid var(--color-ink);

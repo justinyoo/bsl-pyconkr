@@ -11,6 +11,7 @@ from bsl_agent.models import (
     SchoolMealsResult,
     SchoolSearchResult,
 )
+from bsl_agent.mcp_client import MealNotFoundError
 from bsl_agent.workflow import EvaluationRuntime, build_workflow
 
 
@@ -50,6 +51,15 @@ class FixtureGateway:
         )
 
 
+class PartialFixtureGateway(FixtureGateway):
+    async def get_school_lunch(
+        self, school: School, meal_date: date
+    ) -> SchoolMealsResult:
+        if school.school_code == "school-1":
+            raise MealNotFoundError("선택한 기간에 중식 정보가 없습니다.")
+        return await super().get_school_lunch(school, meal_date)
+
+
 @pytest.mark.anyio
 async def test_workflow_runs_three_evaluators_and_preserves_weighted_scores() -> None:
     gateway = FixtureGateway()
@@ -77,6 +87,34 @@ async def test_workflow_runs_three_evaluators_and_preserves_weighted_scores() ->
     assert result.school_scores[1].total_score == 80
     assert result.outcome == "second"
     assert result.winner_school_code == "school-2"
+    assert result.unavailable_schools == []
+
+
+@pytest.mark.anyio
+async def test_workflow_evaluates_available_school_without_declaring_winner() -> None:
+    gateway = PartialFixtureGateway()
+    runtime = EvaluationRuntime(gateway=gateway, model=None, fixture_mode=True)
+    workflow = build_workflow(runtime)
+    request = {
+        "schools": [
+            gateway.schools[0].model_dump(by_alias=True),
+            gateway.schools[1].model_dump(by_alias=True),
+        ],
+        "date": date.today().isoformat(),
+        "prompt": "확인 가능한 정보만 사용해 분석해 주세요.",
+    }
+
+    run_result = await workflow.run(
+        [Message(role="user", contents=[json.dumps(request)])]
+    )
+    result = BattleEvaluation.model_validate_json(run_result.get_outputs()[0])
+
+    assert len(result.school_scores) == 1
+    assert result.school_scores[0].school.school_code == "school-2"
+    assert len(result.school_scores[0].criteria) == 3
+    assert result.outcome == "incomplete"
+    assert result.winner_school_code is None
+    assert result.unavailable_schools == [gateway.schools[0]]
 
 
 @pytest.mark.anyio

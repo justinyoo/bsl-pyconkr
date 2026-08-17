@@ -25,6 +25,10 @@ class McpToolError(RuntimeError):
     """MCP 도구가 안전한 오류 결과를 반환했을 때의 애플리케이션 예외."""
 
 
+class MealNotFoundError(McpToolError):
+    """선택한 날짜에 해당 학교의 중식 데이터가 없을 때의 예외."""
+
+
 class McpMealGateway:
     def __init__(self, url: str) -> None:
         self._url = url
@@ -71,7 +75,13 @@ class McpMealGateway:
                     "to_date": meal_date.isoformat(),
                 },
             )
-        parsed = SchoolMealsResult.model_validate(self._structured(result))
+        try:
+            structured = self._structured(result)
+        except McpToolError as exc:
+            if "중식 정보가 없습니다." in str(exc):
+                raise MealNotFoundError(str(exc)) from exc
+            raise
+        parsed = SchoolMealsResult.model_validate(structured)
         if len(parsed.meals) != 1 or parsed.meals[0].date != meal_date:
             raise McpToolError("선택한 날짜의 중식 정보가 정확히 한 건이어야 합니다.")
         return parsed

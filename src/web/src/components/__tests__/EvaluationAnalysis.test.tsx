@@ -94,6 +94,7 @@ const result: BattleEvaluation = {
       ],
     },
   ],
+  unavailableSchools: [],
   outcome: 'second',
   winnerSchoolCode: 'S2',
   summary: '예시학교2의 구성이 더 균형 잡혔습니다.',
@@ -137,5 +138,38 @@ describe('EvaluationAnalysis', () => {
     expect(screen.getByText('60.0점')).toBeInTheDocument()
     expect(screen.getByText('80.0점')).toBeInTheDocument()
     expect(screen.getByText('영양 한계')).toBeInTheDocument()
+  })
+
+  it('shows the unavailable school and completes the other school analysis', async () => {
+    const user = userEvent.setup()
+    mocks.runEvaluation.mockResolvedValue({
+      ...result,
+      schoolScores: [result.schoolScores[1]],
+      unavailableSchools: [schools[0]],
+      outcome: 'incomplete',
+      winnerSchoolCode: null,
+      summary: '한 학교의 급식 정보가 없어 가능한 학교만 분석했습니다.',
+      improvements: { S2: ['염도를 확인합니다.'] },
+    })
+    render(<EvaluationAnalysis />)
+
+    await screen.findAllByRole('checkbox')
+    await user.click(screen.getByText('예시학교1'))
+    await user.click(screen.getByText('예시학교2'))
+    await user.click(screen.getByRole('button', { name: '급식 배틀 시작' }))
+
+    expect(
+      await screen.findByRole('heading', {
+        name: '급식 정보 부족으로 승패를 보류합니다',
+      }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('분석 불가')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        '선택한 날짜의 중식 정보가 없어 이 학교는 분석할 수 없습니다.',
+      ),
+    ).toBeInTheDocument()
+    expect(screen.getByText('80.0점')).toBeInTheDocument()
+    expect(screen.queryByText('60.0점')).not.toBeInTheDocument()
   })
 })
