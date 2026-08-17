@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from typing import Never
 
@@ -30,6 +31,7 @@ from bsl_agent.models import (
     EvaluationContext,
     EvaluationRequest,
     FinalNarrative,
+    School,
     ScoredEvaluation,
     SchoolScore,
     WeightedCriterionResult,
@@ -37,6 +39,13 @@ from bsl_agent.models import (
 from bsl_agent.prompts import CRITERIA, DATA_LIMITS, RATING_SCALE
 
 _JSON_BLOCK = re.compile(r"```(?:json)?\s*(\{.*\})\s*```", re.DOTALL)
+_NATURAL_REQUEST = re.compile(
+    r"^\s*(?P<date>\d{4}-\d{2}-\d{2})의\s+"
+    r"(?P<first_name>.+?)\((?P<first_location>[^()]+)\)과\s+"
+    r"(?P<second_name>.+?)\((?P<second_location>[^()]+)\)\s+중식을\s+"
+    r"(?P<instruction>.+?)\s*$",
+    re.DOTALL,
+)
 
 
 def _json_object(text: str) -> str:
@@ -51,15 +60,61 @@ def _json_object(text: str) -> str:
     return stripped[start : end + 1]
 
 
-def _request_from_input(value: str | list[Message]) -> EvaluationRequest:
+def _input_text(value: str | list[Message]) -> str:
     if isinstance(value, str):
-        content = value
-    else:
-        user_messages = [message for message in value if message.role == "user"]
-        if not user_messages:
-            raise ValueError("평가 요청 메시지가 없습니다.")
-        content = user_messages[-1].text
-    return EvaluationRequest.model_validate_json(content)
+        return value.strip()
+    user_messages = [message for message in value if message.role == "user"]
+    if not user_messages:
+        raise ValueError("평가 요청 메시지가 없습니다.")
+    return user_messages[-1].text.strip()
+
+
+async def _resolve_school(
+    gateway: MealGateway, school_name: str, location_name: str
+) -> School:
+    result = await gateway.search_schools(school_name)
+    matches = [
+        school
+        for school in result.schools
+        if school.school_name == school_name
+        and location_name
+        in {school.location_name, school.education_office_name}
+    ]
+    if not matches:
+        raise ValueError(
+            f"'{school_name}({location_name})'에 해당하는 학교를 찾을 수 없습니다."
+        )
+    if len(matches) > 1:
+        raise ValueError(
+            f"'{school_name}({location_name})'에 해당하는 학교가 여러 곳입니다."
+        )
+    return matches[0]
+
+
+async def _request_from_input(
+    value: str | list[Message], gateway: MealGateway
+) -> EvaluationRequest:
+    content = _input_text(value)
+    if content.startswith("{"):
+        return EvaluationRequest.model_validate_json(content)
+
+    match = _NATURAL_REQUEST.fullmatch(content)
+    if match is None:
+        raise ValueError(
+            "자연어 요청은 'YYYY-MM-DD의 학교명(지역)과 학교명(지역) 중식을 "
+            "...' 형식이어야 합니다."
+        )
+    first_school = await _resolve_school(
+        gateway, match["first_name"].strip(), match["first_location"].strip()
+    )
+    second_school = await _resolve_school(
+        gateway, match["second_name"].strip(), match["second_location"].strip()
+    )
+    return EvaluationRequest(
+        schools=[first_school, second_school],
+        date=date.fromisoformat(match["date"]),
+        prompt=content,
+    )
 
 
 class PrepareEvaluationExecutor(Executor):
@@ -73,7 +128,7 @@ class PrepareEvaluationExecutor(Executor):
         value: str | list[Message],
         ctx: WorkflowContext[EvaluationContext],
     ) -> None:
-        request = _request_from_input(value)
+        request = await _request_from_input(value, self._gateway)
         meals = []
         unavailable_schools = []
         for school in request.schools:
