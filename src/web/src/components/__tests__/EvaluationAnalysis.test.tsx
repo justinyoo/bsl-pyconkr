@@ -122,6 +122,9 @@ describe('EvaluationAnalysis', () => {
 
     expect(screen.getAllByRole('checkbox', { checked: false })[0]).toBeDisabled()
     const prompt = screen.getByLabelText('3. 분석 요청문')
+    expect(prompt).toHaveValue(
+      '2026-08-17의 예시학교1(서울특별시)과 예시학교2(서울특별시) 중식을 평가 루브릭에 따라 비교해 주세요. 확인 가능한 NEIS 데이터만 근거로 사용하고, 각 학교의 개선안을 제시해 주세요.',
+    )
     await user.clear(prompt)
     await user.type(prompt, '수정한 분석 요청')
     await user.click(screen.getByRole('button', { name: '급식 배틀 시작' }))

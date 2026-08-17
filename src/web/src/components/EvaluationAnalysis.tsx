@@ -31,11 +31,12 @@ function defaultPrompt(
   date: string,
 ) {
   const names = selected
+    .map((code) => schools.find((school) => school.schoolCode === code))
+    .filter((school): school is EvaluationSchool => Boolean(school))
     .map(
-      (code) =>
-        schools.find((school) => school.schoolCode === code)?.schoolName,
+      (school) =>
+        `${school.schoolName}(${school.locationName ?? school.educationOfficeName})`,
     )
-    .filter(Boolean)
   return names.length === 2
     ? `${date}의 ${names[0]}과 ${names[1]} 중식을 평가 루브릭에 따라 비교해 주세요. 확인 가능한 NEIS 데이터만 근거로 사용하고, 각 학교의 개선안을 제시해 주세요.`
     : '비교할 두 학교와 날짜를 선택하면 분석 요청문이 만들어집니다.'
