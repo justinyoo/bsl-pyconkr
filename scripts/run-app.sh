@@ -1,0 +1,96 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
+BACKEND_PID=""
+FRONTEND_PID=""
+
+load_dotenv() {
+  local env_file="$1"
+  local key value
+
+  [[ -f "${env_file}" ]] || return
+
+  while IFS='=' read -r key value; do
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+    [[ -z "${key}" || "${key}" == \#* ]] && continue
+    [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || continue
+    [[ -n "${!key+x}" ]] && continue
+
+    value="${value%$'\r'}"
+    if [[ "${value}" =~ ^\".*\"$ || "${value}" =~ ^\'.*\'$ ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+    export "${key}=${value}"
+  done < "${env_file}"
+}
+
+stop_process_tree() {
+  local pid="$1"
+  local child
+
+  [[ -n "${pid}" ]] || return
+  for child in $(pgrep -P "${pid}" 2>/dev/null || true); do
+    stop_process_tree "${child}"
+  done
+  kill -TERM "${pid}" 2>/dev/null || true
+}
+
+cleanup() {
+  trap - EXIT INT TERM
+  stop_process_tree "${FRONTEND_PID}"
+  stop_process_tree "${BACKEND_PID}"
+  [[ -z "${FRONTEND_PID}" ]] || wait "${FRONTEND_PID}" 2>/dev/null || true
+  [[ -z "${BACKEND_PID}" ]] || wait "${BACKEND_PID}" 2>/dev/null || true
+}
+
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+load_dotenv "${REPO_ROOT}/.env"
+
+BACKEND_PORT="${BACKEND_PORT:-8000}"
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+export VITE_BACKEND_ORIGIN="${VITE_BACKEND_ORIGIN:-http://localhost:${BACKEND_PORT}}"
+
+if [[ -z "${NEIS_API_KEY:-}" && "${NEIS_FIXTURE_MODE:-false}" != "true" ]]; then
+  echo "NEIS_API_KEY를 설정하거나 NEIS_FIXTURE_MODE=true를 지정하세요." >&2
+  exit 1
+fi
+
+if [[ ! -d "${REPO_ROOT}/src/web/node_modules" ]]; then
+  echo "==> 프론트엔드 의존성 설치"
+  (cd "${REPO_ROOT}/src/web" && npm ci)
+fi
+
+echo "==> 백엔드 시작: http://localhost:${BACKEND_PORT}"
+(
+  cd "${REPO_ROOT}/src/api"
+  exec uv run fastapi dev src/bsl_api/main.py --host 0.0.0.0 \
+    --port "${BACKEND_PORT}"
+) &
+BACKEND_PID=$!
+
+echo "==> 프론트엔드 시작: http://localhost:${FRONTEND_PORT}"
+(
+  cd "${REPO_ROOT}/src/web"
+  exec npm run dev -- --host 0.0.0.0 --port "${FRONTEND_PORT}"
+) &
+FRONTEND_PID=$!
+
+echo "CTRL+C를 누르면 두 앱을 모두 종료합니다."
+
+while kill -0 "${BACKEND_PID}" 2>/dev/null &&
+  kill -0 "${FRONTEND_PID}" 2>/dev/null; do
+  sleep 1
+done
+
+if ! kill -0 "${BACKEND_PID}" 2>/dev/null; then
+  wait "${BACKEND_PID}"
+else
+  wait "${FRONTEND_PID}"
+fi

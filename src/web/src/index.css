@@ -1,0 +1,365 @@
+/*
+ * 급식 배틀 디자인 시스템: 모바일 우선 Bento Grid + 네오브루탈리즘.
+ * - 두꺼운 테두리와 하드 섀도우, 높은 대비의 색상을 사용한다.
+ * - 모든 상호작용 요소는 키보드 포커스 스타일을 명확히 표시한다.
+ */
+
+:root {
+  --color-bg: #fdf6e9;
+  --color-surface: #ffffff;
+  --color-ink: #101010;
+  --color-primary: #ff5c39;
+  --color-secondary: #2ec4b6;
+  --color-accent: #ffd23f;
+  --color-danger: #ff3b3b;
+  --color-danger-bg: #ffe5e0;
+  --color-muted: #6b6b6b;
+
+  --border-width: 3px;
+  --border-radius: 14px;
+  --shadow-offset: 6px;
+  --shadow-hard: var(--shadow-offset) var(--shadow-offset) 0 var(--color-ink);
+
+  --space-1: 0.5rem;
+  --space-2: 0.75rem;
+  --space-3: 1rem;
+  --space-4: 1.5rem;
+  --space-5: 2rem;
+
+  color-scheme: light;
+  font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Segoe UI', system-ui,
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+  overflow-x: hidden;
+}
+
+button,
+input {
+  font-family: inherit;
+  font-size: 1rem;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: var(--space-3);
+}
+
+@media (min-width: 720px) {
+  .app-main {
+    padding: var(--space-5);
+  }
+}
+
+/* --- 헤더 --- */
+
+.site-header {
+  border-bottom: var(--border-width) solid var(--color-ink);
+  background-color: var(--color-surface);
+  padding: var(--space-3);
+}
+
+.site-header__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.site-header__mark {
+  font-size: 2rem;
+}
+
+.site-header__title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+}
+
+.site-header__subtitle {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+/* --- Bento Grid --- */
+
+.bento-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+@media (min-width: 720px) {
+  .bento-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.bento-card {
+  background-color: var(--color-surface);
+  border: var(--border-width) solid var(--color-ink);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-hard);
+  padding: var(--space-4);
+}
+
+/* --- 검색 --- */
+
+.school-search-form {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.school-search-form__label {
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.school-search-form__input {
+  border: var(--border-width) solid var(--color-ink);
+  border-radius: 10px;
+  padding: var(--space-2) var(--space-3);
+  background-color: var(--color-bg);
+}
+
+.school-search-form__hint {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+.school-results-list {
+  grid-column: 1 / -1;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+
+@media (min-width: 720px) {
+  .school-results-list {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.school-result-card {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+  background-color: var(--color-surface);
+}
+
+.school-result-card:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px)
+    0 var(--color-ink);
+}
+
+.school-result-card:active {
+  transform: translate(0, 0);
+  box-shadow: 2px 2px 0 var(--color-ink);
+}
+
+.school-result-card__name {
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.school-result-card__meta {
+  color: var(--color-muted);
+  font-size: 0.85rem;
+}
+
+/* --- 상태 패널 --- */
+
+.status-panel {
+  grid-column: 1 / -1;
+}
+
+.status-panel__title {
+  margin: 0 0 var(--space-1);
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+
+.status-panel__description {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.status-panel--error {
+  background-color: var(--color-danger-bg);
+  border-color: var(--color-danger);
+}
+
+.status-panel--error .status-panel__title {
+  color: var(--color-danger);
+}
+
+.status-panel--empty {
+  background-color: var(--color-accent);
+}
+
+.status-panel--loading {
+  background-color: var(--color-secondary);
+  color: var(--color-surface);
+}
+
+.status-panel--loading .status-panel__title {
+  color: var(--color-surface);
+}
+
+/* --- 날짜 선택 --- */
+
+.date-selection-summary,
+.meal-results-summary {
+  grid-column: 1 / -1;
+}
+
+.date-selection-summary__eyebrow,
+.meal-results-summary__eyebrow {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.date-selection-summary h2,
+.meal-results-summary h2 {
+  margin: var(--space-1) 0 0;
+}
+
+.flow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.secondary-button {
+  background-color: var(--color-accent);
+  color: var(--color-ink);
+  border: 2px solid var(--color-ink);
+  border-radius: 8px;
+  padding: var(--space-1) var(--space-2);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  transform: translate(-1px, -1px);
+  box-shadow: 3px 3px 0 var(--color-ink);
+}
+
+.date-selection-picker {
+  grid-column: 1 / -1;
+  overflow-x: auto;
+}
+
+.primary-button {
+  grid-column: 1 / -1;
+  justify-self: start;
+  background-color: var(--color-primary);
+  color: var(--color-surface);
+  border: var(--border-width) solid var(--color-ink);
+  border-radius: 10px;
+  box-shadow: var(--shadow-hard);
+  padding: var(--space-2) var(--space-4);
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+}
+
+.primary-button:disabled {
+  background-color: var(--color-muted);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.primary-button:not(:disabled):hover {
+  transform: translate(-2px, -2px);
+  box-shadow: calc(var(--shadow-offset) + 2px) calc(var(--shadow-offset) + 2px)
+    0 var(--color-ink);
+}
+
+/* --- 급식 결과 --- */
+
+.meal-results-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-3);
+}
+
+@media (min-width: 560px) {
+  .meal-results-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 960px) {
+  .meal-results-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.meal-card__header h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 1.05rem;
+}
+
+.meal-card__dishes {
+  margin: 0;
+  padding-left: 1.1rem;
+}
+
+.meal-card__calories {
+  margin: var(--space-2) 0 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+
+.meal-card__empty {
+  color: var(--color-muted);
+  font-style: italic;
+}
