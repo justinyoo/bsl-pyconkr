@@ -29,6 +29,10 @@ test.describe('학교 급식 조회 핵심 흐름', () => {
 
     const populatedCards = page.locator('.meal-card__dishes')
     await expect(populatedCards.first()).toBeVisible()
+    await expect(page.getByText('쌀: 국내산').first()).toBeVisible()
+    await expect(page.getByText('탄수화물(g) : 120.5').first()).toBeVisible()
+    await expect(page.getByText('650 Kcal').first()).toBeVisible()
+    await expect(page.getByText('450명').first()).toBeVisible()
 
     await page.getByRole('button', { name: '날짜 다시 선택' }).click()
     await expect(dateGrid).toBeVisible()
@@ -52,5 +56,14 @@ test.describe('학교 급식 조회 핵심 흐름', () => {
     await page.getByLabel('학교 이름으로 검색').fill('존재하지않는학교이름')
 
     await expect(page.getByText('검색 결과가 없어요')).toBeVisible()
+  })
+
+  test('선택한 날짜 범위를 초기화할 수 있다', async ({ page }) => {
+    await searchAndSelectFixtureSchool(page)
+
+    await page.getByRole('button', { name: '날짜 선택 초기화' }).click()
+
+    await expect(page.getByText('날짜를 선택해 주세요.')).toBeVisible()
+    await expect(page.getByRole('button', { name: '급식 조회' })).toBeDisabled()
   })
 })

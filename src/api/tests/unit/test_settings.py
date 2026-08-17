@@ -24,3 +24,20 @@ def test_settings_accepts_api_key_when_provided() -> None:
     settings = Settings(neis_api_key="test-key", neis_fixture_mode=False)
 
     assert settings.neis_api_key == "test-key"
+
+
+def test_settings_normalizes_log_level() -> None:
+    settings = Settings(
+        neis_api_key="test-key", neis_fixture_mode=False, log_level="warning"
+    )
+
+    assert settings.log_level == "WARNING"
+
+
+def test_settings_rejects_unknown_log_level() -> None:
+    with pytest.raises(ValidationError, match="log_level"):
+        Settings(
+            neis_api_key="test-key",
+            neis_fixture_mode=False,
+            log_level="VERBOSE",
+        )

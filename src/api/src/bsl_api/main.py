@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from bsl_api.api import health, meals, schools
 from bsl_api.errors import register_exception_handlers
+from bsl_api.middleware import RequestLoggingMiddleware
 from bsl_api.settings import get_settings
 
 API_PREFIX = "/api/v1"
@@ -14,6 +17,7 @@ API_PREFIX = "/api/v1"
 
 def create_app() -> FastAPI:
     settings = get_settings()
+    logging.getLogger("bsl_api").setLevel(settings.log_level)
 
     app = FastAPI(
         title="Battle School Lunch API",
@@ -27,6 +31,7 @@ def create_app() -> FastAPI:
         allow_methods=["GET"],
         allow_headers=["*"],
     )
+    app.add_middleware(RequestLoggingMiddleware)
 
     register_exception_handlers(app)
 

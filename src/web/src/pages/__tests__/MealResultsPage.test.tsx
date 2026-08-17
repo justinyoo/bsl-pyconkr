@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MealResultsPage } from '../MealResultsPage'
 import { renderWithProviders } from '../../test/renderWithProviders'
@@ -37,29 +38,46 @@ describe('MealResultsPage', () => {
     renderPage()
 
     expect(await screen.findByText('현미밥')).toBeInTheDocument()
+    expect(screen.getByText('742.3 Kcal')).toBeInTheDocument()
+    expect(screen.getByText('530명')).toBeInTheDocument()
+    expect(screen.getByText('쌀: 국내산')).toBeInTheDocument()
+    expect(screen.getByText('탄수화물(g): 92.1')).toBeInTheDocument()
     expect(screen.getByText('급식 정보 없음')).toBeInTheDocument()
   })
 
-  it('shows an error state when the backend request fails', async () => {
+  it('offers a retry when the backend request fails', async () => {
+    let attempts = 0
     server.use(
-      http.get('http://localhost/api/v1/schools/:schoolCode/meals', () =>
-        HttpResponse.json(
-          {
-            type: 'https://example.invalid/problems/upstream',
-            title: 'Upstream error',
-            status: 502,
-            code: 'UPSTREAM_ERROR',
-            detail: 'NEIS 서버에서 오류가 발생했습니다.',
-          },
-          { status: 502 },
-        ),
-      ),
+      http.get('http://localhost/api/v1/schools/:schoolCode/meals', () => {
+        attempts += 1
+        if (attempts === 1) {
+          return HttpResponse.json(
+            {
+              type: 'https://example.invalid/problems/upstream',
+              title: 'Upstream error',
+              status: 502,
+              code: 'UPSTREAM_ERROR',
+              detail: 'NEIS 서버에서 오류가 발생했습니다.',
+            },
+            { status: 502 },
+          )
+        }
+        return HttpResponse.json({
+          school: SEOUL_HIGH_SCHOOL,
+          from: YESTERDAY_ISO,
+          to: TODAY_ISO,
+          meals: [],
+        })
+      }),
     )
 
+    const user = userEvent.setup()
     renderPage()
 
     expect(
       await screen.findByText('급식 정보를 불러오지 못했어요'),
     ).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '다시 시도' }))
+    expect(await screen.findAllByText('급식 정보 없음')).toHaveLength(2)
   })
 })

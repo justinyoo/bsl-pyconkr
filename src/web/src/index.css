@@ -269,6 +269,11 @@ input {
   margin: var(--space-1) 0 0;
 }
 
+.date-selection-summary__range {
+  margin: var(--space-2) 0 0;
+  color: var(--color-muted);
+}
+
 .flow-actions {
   display: flex;
   flex-wrap: wrap;
@@ -289,6 +294,14 @@ input {
 .secondary-button:hover {
   transform: translate(-1px, -1px);
   box-shadow: 3px 3px 0 var(--color-ink);
+}
+
+.secondary-button:disabled {
+  color: var(--color-muted);
+  background-color: var(--color-surface-soft);
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .date-selection-picker {
@@ -353,10 +366,28 @@ input {
   padding-left: 1.1rem;
 }
 
-.meal-card__calories {
+.meal-card__metadata {
   margin: var(--space-2) 0 0;
   font-size: 0.85rem;
   color: var(--color-muted);
+}
+
+.meal-card__information {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-ink);
+}
+
+.meal-card__information h4 {
+  margin: 0 0 var(--space-1);
+  font-size: 0.9rem;
+}
+
+.meal-card__information ul {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--color-muted);
+  font-size: 0.85rem;
 }
 
 .meal-card__empty {

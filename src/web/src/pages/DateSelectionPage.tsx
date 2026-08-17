@@ -50,6 +50,11 @@ export function DateSelectionPage({
       <div className="bento-card date-selection-summary">
         <p className="date-selection-summary__eyebrow">선택한 학교</p>
         <h2>{school.schoolName}</h2>
+        <p className="date-selection-summary__range">
+          {range?.from && range.to
+            ? `${localDateToIso(range.from)} ~ ${localDateToIso(range.to)}`
+            : '날짜를 선택해 주세요.'}
+        </p>
         <div className="flow-actions">
           <button
             type="button"
@@ -63,6 +68,16 @@ export function DateSelectionPage({
 
       <div className="bento-card date-selection-picker">
         <DateRangePicker range={range} onChange={setRange} />
+        <div className="flow-actions">
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => setRange(undefined)}
+            disabled={!range}
+          >
+            날짜 선택 초기화
+          </button>
+        </div>
       </div>
 
       {!validation.valid ? (

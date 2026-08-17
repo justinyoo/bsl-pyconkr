@@ -12,7 +12,8 @@ interface SchoolSearchPageProps {
 
 export function SchoolSearchPage({ onSelect }: SchoolSearchPageProps) {
   const [query, setQuery] = useState('')
-  const { data, isQueryValid, isLoading, isError, error } = useSchoolSearch(query)
+  const { data, isQueryValid, isLoading, isError, error, refetch } =
+    useSchoolSearch(query)
 
   return (
     <section className="bento-grid bento-grid--search">
@@ -27,7 +28,15 @@ export function SchoolSearchPage({ onSelect }: SchoolSearchPageProps) {
           tone="error"
           title="검색 중 문제가 발생했어요"
           description={describeError(error)}
-        />
+        >
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void refetch()}
+          >
+            다시 시도
+          </button>
+        </StatusPanel>
       ) : null}
 
       {isQueryValid && data && data.items.length === 0 ? (

@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 import httpx
@@ -20,6 +21,7 @@ from bsl_api.clients.exceptions import (
 
 _SCHOOL_INFO_PATH = "/hub/schoolInfo"
 _MEAL_SERVICE_PATH = "/hub/mealServiceDietInfo"
+_LOGGER = logging.getLogger("bsl_api.neis")
 
 # NEIS는 요청 위치 오류 시 코드에 "INFO-"/"ERROR-" 접두어를 붙이는 문서와
 # 접두어 없이 숫자만 반환하는 문서가 모두 존재해 두 형태를 모두 처리한다.
@@ -66,10 +68,17 @@ class NeisClient:
             async with self._client() as client:
                 response = await client.get(path, params=request_params)
         except httpx.TimeoutException as exc:
+            _LOGGER.warning("NEIS request timed out path=%s", path)
             raise NeisUnavailableError("NEIS 요청이 시간 초과되었습니다.") from exc
         except httpx.ConnectError as exc:
+            _LOGGER.warning("NEIS connection failed path=%s", path)
             raise NeisUnavailableError("NEIS에 연결할 수 없습니다.") from exc
         except httpx.HTTPError as exc:
+            _LOGGER.warning(
+                "NEIS HTTP request failed path=%s error_type=%s",
+                path,
+                type(exc).__name__,
+            )
             raise NeisUnavailableError("NEIS 요청 중 알 수 없는 오류가 발생했습니다.") from exc
 
         if response.status_code >= 500:

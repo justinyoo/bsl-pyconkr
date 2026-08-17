@@ -33,6 +33,28 @@ describe('SchoolSearchPage', () => {
     expect(onSelect).toHaveBeenCalledWith(SEOUL_HIGH_SCHOOL)
   })
 
+  it('debounces input changes into one search request', async () => {
+    let requestCount = 0
+    server.use(
+      http.get('http://localhost/api/v1/schools', () => {
+        requestCount += 1
+        return HttpResponse.json({ items: [SEOUL_HIGH_SCHOOL], total: 1 })
+      }),
+    )
+    const user = userEvent.setup()
+    renderWithProviders(<SchoolSearchPage onSelect={vi.fn()} />)
+
+    await user.type(
+      screen.getByRole('searchbox', { name: '학교 이름으로 검색' }),
+      '서울고',
+    )
+
+    expect(
+      await screen.findByRole('button', { name: /서울고등학교/ }),
+    ).toBeInTheDocument()
+    expect(requestCount).toBe(1)
+  })
+
   it('shows an empty state when no school matches', async () => {
     const user = userEvent.setup()
     renderWithProviders(<SchoolSearchPage onSelect={vi.fn()} />)

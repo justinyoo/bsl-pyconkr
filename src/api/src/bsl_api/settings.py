@@ -1,9 +1,12 @@
 """애플리케이션 설정. 환경 변수는 시작 시 검증한다."""
 
 from functools import lru_cache
+from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
 
 class Settings(BaseSettings):
@@ -31,7 +34,14 @@ class Settings(BaseSettings):
         default="http://localhost:5173",
         description="쉼표로 구분된 허용 origin 목록",
     )
-    log_level: str = Field(default="INFO", description="애플리케이션 로그 수준")
+    log_level: LogLevel = Field(
+        default="INFO", description="애플리케이션 로그 수준"
+    )
+
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def _normalize_log_level(cls, value: object) -> object:
+        return value.upper() if isinstance(value, str) else value
 
     @model_validator(mode="after")
     def _require_api_key_unless_fixture_mode(self) -> "Settings":
@@ -55,4 +65,3 @@ def get_settings() -> Settings:
     """설정을 한 번만 로드하고 이후 요청에서 재사용한다."""
 
     return Settings()  # type: ignore[call-arg]
-

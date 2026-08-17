@@ -24,7 +24,7 @@ export function MealResultsPage({
 }: MealResultsPageProps) {
   const validation = validateDateRange(isoToLocalDate(from), isoToLocalDate(to))
 
-  const { data, isLoading, isError, error } = useSchoolMeals({
+  const { data, isLoading, isError, error, refetch } = useSchoolMeals({
     schoolCode: school.schoolCode,
     officeCode: school.educationOfficeCode,
     from,
@@ -75,7 +75,15 @@ export function MealResultsPage({
           tone="error"
           title="급식 정보를 불러오지 못했어요"
           description={describeError(error)}
-        />
+        >
+          <button
+            type="button"
+            className="secondary-button"
+            onClick={() => void refetch()}
+          >
+            다시 시도
+          </button>
+        </StatusPanel>
       ) : null}
 
       {validation.valid && data ? (

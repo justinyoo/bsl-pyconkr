@@ -49,4 +49,20 @@ describe('DateSelectionPage', () => {
     expect(screen.getByText('날짜 범위를 확인해 주세요')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '급식 조회' })).toBeDisabled()
   })
+
+  it('clears the selected range and disables submit', async () => {
+    const user = userEvent.setup()
+    renderWithProviders(
+      <DateSelectionPage
+        school={SEOUL_HIGH_SCHOOL}
+        onChangeSchool={vi.fn()}
+        onSubmit={vi.fn()}
+      />,
+    )
+
+    await user.click(screen.getByRole('button', { name: '날짜 선택 초기화' }))
+
+    expect(screen.getByText('날짜를 선택해 주세요.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '급식 조회' })).toBeDisabled()
+  })
 })

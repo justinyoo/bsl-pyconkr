@@ -26,17 +26,44 @@ export function MealCard({ date, meal }: MealCardProps) {
       {meal ? (
         <>
           <ul className="meal-card__dishes">
-            {meal.dishes.map((dish) => (
-              <li key={dish}>{dish}</li>
+            {meal.dishes.map((dish, index) => (
+              <li key={`${dish}-${index}`}>{dish}</li>
             ))}
           </ul>
           {meal.calories ? (
-            <p className="meal-card__calories">{meal.calories}</p>
+            <p className="meal-card__metadata">
+              <strong>열량</strong> {meal.calories}
+            </p>
           ) : null}
+          {meal.servingCount !== null ? (
+            <p className="meal-card__metadata">
+              <strong>급식 인원</strong>{' '}
+              {meal.servingCount.toLocaleString('ko-KR')}명
+            </p>
+          ) : null}
+          <MealInformation title="원산지" items={meal.origins} />
+          <MealInformation title="영양 정보" items={meal.nutrition} />
         </>
       ) : (
         <p className="meal-card__empty">급식 정보 없음</p>
       )}
     </article>
+  )
+}
+
+function MealInformation({ title, items }: { title: string; items: string[] }) {
+  if (items.length === 0) {
+    return null
+  }
+
+  return (
+    <section className="meal-card__information">
+      <h4>{title}</h4>
+      <ul>
+        {items.map((item, index) => (
+          <li key={`${item}-${index}`}>{item}</li>
+        ))}
+      </ul>
+    </section>
   )
 }

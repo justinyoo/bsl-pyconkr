@@ -27,7 +27,7 @@ export function DateRangePicker({ range, onChange }: DateRangePickerProps) {
         onSelect={onChange}
         startMonth={bounds.start}
         endMonth={bounds.end}
-        hidden={[{ before: bounds.start }, { after: bounds.end }]}
+        disabled={[{ before: bounds.start }, { after: bounds.end }]}
         numberOfMonths={isWide ? 2 : 1}
         defaultMonth={range?.from ?? bounds.end}
         showOutsideDays
@@ -36,4 +36,3 @@ export function DateRangePicker({ range, onChange }: DateRangePickerProps) {
     </div>
   )
 }
-
