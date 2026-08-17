@@ -59,8 +59,9 @@ cd src/agent
 uv run bsl-agent
 ```
 
-워크플로우를 DevUI에서 확인하려면 별도 터미널에서 다음 명령을 실행하고
-`http://localhost:8080`을 엽니다.
+워크플로우를 DevUI에서 확인하려면 `http://localhost:8080`을 엽니다.
+루트의 `run-app` 스크립트는 DevUI를 함께 실행합니다. 에이전트 앱만 개발할
+때는 별도 터미널에서 다음 명령을 사용할 수 있습니다.
 
 ```sh
 cd src/agent

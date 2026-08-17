@@ -69,6 +69,11 @@ try {
     $FrontendPort = if ($env:FRONTEND_PORT) { $env:FRONTEND_PORT } else { "5173" }
     $McpPort = if ($env:MCP_PORT) { $env:MCP_PORT } else { "8001" }
     $AgentPort = if ($env:AGENT_PORT) { $env:AGENT_PORT } else { "8002" }
+    $AgentDevUiPort = if ($env:AGENT_DEVUI_PORT) {
+        $env:AGENT_DEVUI_PORT
+    } else {
+        "8080"
+    }
     if (-not $env:VITE_BACKEND_ORIGIN) {
         $env:VITE_BACKEND_ORIGIN = "http://localhost:$BackendPort"
     }
@@ -127,6 +132,12 @@ try {
         -ArgumentList @("run", "bsl-agent") -NoNewWindow -PassThru
     $Processes.Add($Agent)
 
+    Write-Host "==> Agent Framework DevUI 시작: http://localhost:$AgentDevUiPort"
+    $env:AGENT_DEVUI_PORT = $AgentDevUiPort
+    $DevUi = Start-Process -FilePath $UvCommand -WorkingDirectory "src/agent" `
+        -ArgumentList @("run", "bsl-agent-devui") -NoNewWindow -PassThru
+    $Processes.Add($DevUi)
+
     Write-Host "==> 프론트엔드 시작: http://localhost:$FrontendPort"
     $Frontend = Start-Process -FilePath $NpmCommand -WorkingDirectory "src/web" `
         -ArgumentList @(
@@ -141,6 +152,7 @@ try {
         -not $Backend.HasExited -and
         -not $Mcp.HasExited -and
         -not $Agent.HasExited -and
+        -not $DevUi.HasExited -and
         -not $Frontend.HasExited
     ) {
         Start-Sleep -Milliseconds 500
@@ -152,6 +164,8 @@ try {
         $Mcp
     } elseif ($Agent.HasExited) {
         $Agent
+    } elseif ($DevUi.HasExited) {
+        $DevUi
     } else {
         $Frontend
     }
