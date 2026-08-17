@@ -68,8 +68,22 @@ try {
     $BackendPort = if ($env:BACKEND_PORT) { $env:BACKEND_PORT } else { "8000" }
     $FrontendPort = if ($env:FRONTEND_PORT) { $env:FRONTEND_PORT } else { "5173" }
     $McpPort = if ($env:MCP_PORT) { $env:MCP_PORT } else { "8001" }
+    $AgentPort = if ($env:AGENT_PORT) { $env:AGENT_PORT } else { "8002" }
     if (-not $env:VITE_BACKEND_ORIGIN) {
         $env:VITE_BACKEND_ORIGIN = "http://localhost:$BackendPort"
+    }
+    if (-not $env:VITE_AGENT_ORIGIN) {
+        $env:VITE_AGENT_ORIGIN = "http://localhost:$AgentPort"
+    }
+    if (-not $env:MCP_SERVER_URL) {
+        $env:MCP_SERVER_URL = "http://localhost:$McpPort/mcp"
+    }
+    if (-not $env:AGENT_FIXTURE_MODE) {
+        $env:AGENT_FIXTURE_MODE = if ($env:NEIS_FIXTURE_MODE) {
+            $env:NEIS_FIXTURE_MODE
+        } else {
+            "false"
+        }
     }
 
     if (
@@ -107,6 +121,12 @@ try {
         -ArgumentList @("run", "bsl-mcp") -NoNewWindow -PassThru
     $Processes.Add($Mcp)
 
+    Write-Host "==> 에이전트 앱 시작: http://localhost:$AgentPort"
+    $env:AGENT_PORT = $AgentPort
+    $Agent = Start-Process -FilePath $UvCommand -WorkingDirectory "src/agent" `
+        -ArgumentList @("run", "bsl-agent") -NoNewWindow -PassThru
+    $Processes.Add($Agent)
+
     Write-Host "==> 프론트엔드 시작: http://localhost:$FrontendPort"
     $Frontend = Start-Process -FilePath $NpmCommand -WorkingDirectory "src/web" `
         -ArgumentList @(
@@ -120,6 +140,7 @@ try {
     while (
         -not $Backend.HasExited -and
         -not $Mcp.HasExited -and
+        -not $Agent.HasExited -and
         -not $Frontend.HasExited
     ) {
         Start-Sleep -Milliseconds 500
@@ -129,6 +150,8 @@ try {
         $Backend
     } elseif ($Mcp.HasExited) {
         $Mcp
+    } elseif ($Agent.HasExited) {
+        $Agent
     } else {
         $Frontend
     }

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import logging
+import random
 from datetime import date, datetime, timedelta
+from math import ceil
 from typing import Any, Protocol
 
 import httpx
@@ -23,6 +25,8 @@ _AUTH_ERROR_CODES = {"100", "290", "300"}
 
 
 class SchoolAndMealClient(Protocol):
+    async def list_schools(self) -> list[dict[str, Any]]: ...
+
     async def search_schools(self, name: str) -> list[dict[str, Any]]: ...
 
     async def get_school(
@@ -135,9 +139,43 @@ class NeisClient:
                     self._raise_for_code(code)
         return rows
 
+    @staticmethod
+    def _total_count(payload: dict[str, Any], root_key: str) -> int:
+        sections = payload.get(root_key)
+        if not isinstance(sections, list):
+            return 0
+        for section in sections:
+            if not isinstance(section, dict):
+                continue
+            head = section.get("head")
+            if not isinstance(head, list):
+                continue
+            for item in head:
+                if not isinstance(item, dict):
+                    continue
+                value = item.get("list_total_count")
+                if isinstance(value, int) and value >= 0:
+                    return value
+        return 0
+
     async def search_schools(self, name: str) -> list[dict[str, Any]]:
         payload = await self._get("/hub/schoolInfo", {"SCHUL_NM": name})
         return self._rows(payload, "schoolInfo")
+
+    async def list_schools(self) -> list[dict[str, Any]]:
+        first_payload = await self._get("/hub/schoolInfo", {})
+        first_rows = self._rows(first_payload, "schoolInfo")
+        page_count = ceil(self._total_count(first_payload, "schoolInfo") / 100)
+        if page_count <= 1:
+            return first_rows
+        page = random.randint(1, page_count)
+        if page == 1:
+            return first_rows
+        payload = await self._get(
+            "/hub/schoolInfo",
+            {"pIndex": str(page), "pSize": "100"},
+        )
+        return self._rows(payload, "schoolInfo") + first_rows
 
     async def get_school(
         self, *, education_office_code: str, school_code: str
@@ -172,31 +210,51 @@ class NeisClient:
         return self._rows(payload, "mealServiceDietInfo")
 
 
-_FIXTURE_SCHOOL = {
-    "SD_SCHUL_CODE": "7010001",
-    "ATPT_OFCDC_SC_CODE": "B10",
-    "SCHUL_NM": "서울고정예시고등학교",
-    "ATPT_OFCDC_SC_NM": "서울특별시교육청",
-    "LCTN_SC_NM": "서울특별시",
-    "SCHUL_KND_SC_NM": "고등학교",
-}
+_FIXTURE_SCHOOLS = [
+    {
+        "SD_SCHUL_CODE": f"70100{index:02d}",
+        "ATPT_OFCDC_SC_CODE": "B10",
+        "SCHUL_NM": name,
+        "ATPT_OFCDC_SC_NM": "서울특별시교육청",
+        "LCTN_SC_NM": "서울특별시",
+        "SCHUL_KND_SC_NM": "고등학교",
+    }
+    for index, name in enumerate(
+        [
+            "서울고정예시고등학교",
+            "한강예시고등학교",
+            "남산예시고등학교",
+            "북악예시고등학교",
+            "한빛예시고등학교",
+            "새봄예시고등학교",
+            "푸른솔예시고등학교",
+            "은하수예시고등학교",
+            "해오름예시고등학교",
+            "가온예시고등학교",
+        ],
+        start=1,
+    )
+]
 
 
 class FixtureNeisClient:
     """외부 네트워크 없이 로컬 데모와 통합 테스트용 데이터를 반환한다."""
 
+    async def list_schools(self) -> list[dict[str, Any]]:
+        return list(_FIXTURE_SCHOOLS)
+
     async def search_schools(self, name: str) -> list[dict[str, Any]]:
-        return [_FIXTURE_SCHOOL] if name in _FIXTURE_SCHOOL["SCHUL_NM"] else []
+        return [school for school in _FIXTURE_SCHOOLS if name in school["SCHUL_NM"]]
 
     async def get_school(
         self, *, education_office_code: str, school_code: str
     ) -> list[dict[str, Any]]:
-        if (
-            education_office_code == _FIXTURE_SCHOOL["ATPT_OFCDC_SC_CODE"]
-            and school_code == _FIXTURE_SCHOOL["SD_SCHUL_CODE"]
-        ):
-            return [_FIXTURE_SCHOOL]
-        return []
+        return [
+            school
+            for school in _FIXTURE_SCHOOLS
+            if education_office_code == school["ATPT_OFCDC_SC_CODE"]
+            and school_code == school["SD_SCHUL_CODE"]
+        ]
 
     async def get_lunches(
         self,
@@ -216,18 +274,39 @@ class FixtureNeisClient:
         rows: list[dict[str, Any]] = []
         cursor = start
         while cursor <= end:
-            rows.append(self._meal_row(cursor))
+            rows.append(self._meal_row(cursor, school_code))
             cursor += timedelta(days=1)
         return rows
 
     @staticmethod
-    def _meal_row(meal_date: date) -> dict[str, Any]:
+    def _meal_row(meal_date: date, school_code: str) -> dict[str, Any]:
+        school_index = int(school_code[-2:])
+        if school_index == 1:
+            return {
+                "MMEAL_SC_CODE": "2",
+                "MLSV_YMD": meal_date.strftime("%Y%m%d"),
+                "DDISH_NM": "현미밥<br/>된장찌개<br/>제육볶음",
+                "ORPLC_INFO": "쌀: 국내산<br/>배추: 국내산",
+                "NTR_INFO": "탄수화물(g): 120.5<br/>단백질(g): 25.3",
+                "CAL_INFO": "650 Kcal",
+                "MLSV_FGR": "450",
+            }
+        calories = 610 + school_index * 12
         return {
             "MMEAL_SC_CODE": "2",
             "MLSV_YMD": meal_date.strftime("%Y%m%d"),
-            "DDISH_NM": "현미밥<br/>된장찌개<br/>제육볶음",
-            "ORPLC_INFO": "쌀: 국내산<br/>배추: 국내산",
-            "NTR_INFO": "탄수화물(g): 120.5<br/>단백질(g): 25.3",
-            "CAL_INFO": "650 Kcal",
-            "MLSV_FGR": "450",
+            "DDISH_NM": (
+                "현미밥<br/>된장찌개<br/>닭갈비<br/>시금치나물<br/>배"
+                if school_index % 2
+                else "보리밥<br/>미역국<br/>고등어구이<br/>두부조림<br/>배추김치"
+            ),
+            "ORPLC_INFO": "쌀: 국내산<br/>배추: 국내산<br/>닭고기: 국내산",
+            "NTR_INFO": (
+                f"탄수화물(g): {105 + school_index}.5<br/>"
+                f"단백질(g): {22 + school_index}.3<br/>"
+                f"지방(g): {14 + school_index}.1<br/>"
+                f"나트륨(mg): {780 + school_index * 15}"
+            ),
+            "CAL_INFO": f"{calories} Kcal",
+            "MLSV_FGR": str(400 + school_index * 10),
         }

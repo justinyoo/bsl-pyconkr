@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import random
 import re
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -127,6 +128,22 @@ async def search_schools(
     if not rows:
         raise SchoolNotFoundError
     schools = [_school(row) for row in rows]
+    return SchoolSearchResult(schools=schools, total=len(schools))
+
+
+async def list_random_schools(
+    client: SchoolAndMealClient,
+    *,
+    count: int = 10,
+    rng: random.Random | random.SystemRandom | None = None,
+) -> SchoolSearchResult:
+    if count < 2 or count > 10:
+        raise ValueError("학교 후보 수는 2개 이상 10개 이하여야 합니다.")
+    rows = await client.list_schools()
+    if len(rows) < count:
+        raise SchoolNotFoundError
+    sampler = rng or random.SystemRandom()
+    schools = [_school(row) for row in sampler.sample(rows, count)]
     return SchoolSearchResult(schools=schools, total=len(schools))
 
 

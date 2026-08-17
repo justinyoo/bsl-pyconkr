@@ -10,6 +10,15 @@ export default defineConfig({
         target: process.env.VITE_BACKEND_ORIGIN ?? 'http://localhost:8000',
         changeOrigin: true,
       },
+      '/agent-api': {
+        target: process.env.VITE_AGENT_ORIGIN ?? 'http://localhost:8002',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/agent-api/, '/api'),
+      },
+      '/ag-ui': {
+        target: process.env.VITE_AGENT_ORIGIN ?? 'http://localhost:8002',
+        changeOrigin: true,
+      },
     },
   },
   test: {

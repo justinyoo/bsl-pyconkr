@@ -1,5 +1,6 @@
 """도구 서비스 입력 검증과 정규화 테스트."""
 
+import random
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
@@ -7,7 +8,7 @@ import pytest
 
 from bsl_mcp.client import FixtureNeisClient
 from bsl_mcp.exceptions import SchoolNotFoundError
-from bsl_mcp.service import get_school_lunches, search_schools
+from bsl_mcp.service import get_school_lunches, list_random_schools, search_schools
 
 
 @pytest.mark.anyio
@@ -29,6 +30,22 @@ async def test_search_schools_rejects_short_query() -> None:
 async def test_search_schools_reports_no_results() -> None:
     with pytest.raises(SchoolNotFoundError):
         await search_schools(FixtureNeisClient(), "없는학교")
+
+
+@pytest.mark.anyio
+async def test_list_random_schools_returns_requested_unique_candidates() -> None:
+    result = await list_random_schools(
+        FixtureNeisClient(), count=10, rng=random.Random(7)
+    )
+
+    assert result.total == 10
+    assert len({school.school_code for school in result.schools}) == 10
+
+
+@pytest.mark.anyio
+async def test_list_random_schools_rejects_invalid_count() -> None:
+    with pytest.raises(ValueError, match="2개 이상 10개 이하"):
+        await list_random_schools(FixtureNeisClient(), count=1)
 
 
 @pytest.mark.anyio
