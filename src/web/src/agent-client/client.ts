@@ -40,6 +40,16 @@ function stepFromEvent(event: {
   return key ? STEP_BY_EXECUTOR[key] : undefined
 }
 
+export function toNaturalEvaluationInput(request: EvaluationRequest): string {
+  const schoolLabel = (school: EvaluationSchool) =>
+    `${school.schoolName}(${school.locationName ?? school.educationOfficeName})`
+  const prefix = `${request.date}의 ${schoolLabel(request.schools[0])}과 ${schoolLabel(request.schools[1])} 중식을`
+  const prompt = request.prompt.trim()
+  return prompt.startsWith(prefix)
+    ? prompt
+    : `${prefix} 평가해 주세요. 추가 요청: ${prompt}`
+}
+
 export async function runEvaluation(
   request: EvaluationRequest,
   onProgress: ProgressHandler,
@@ -51,7 +61,7 @@ export async function runEvaluation(
       {
         id: crypto.randomUUID(),
         role: 'user',
-        content: JSON.stringify(request),
+        content: toNaturalEvaluationInput(request),
       },
     ],
   })
