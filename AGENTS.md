@@ -11,13 +11,14 @@
 - `src/web`: React, TypeScript, Vite 기반 프론트엔드
 - `src/api`: FastAPI, Pydantic, HTTPX 기반 백엔드
 - `src/e2e`: Docker Compose 스택을 대상으로 실행하는 Playwright E2E
+- `src/mcp`: 공식 MCP Python SDK 1.x 기반 Streamable HTTP 서버
 - `src/openapi.json`: 프론트엔드와 백엔드 사이의 내부 API 계약
-- `data/openapi.json`: 백엔드가 호출하는 외부 NEIS API 계약
-- `compose.yml`: 프론트엔드와 백엔드 컨테이너 구성
+- `data/openapi.json`: 백엔드와 MCP 서버가 호출하는 외부 NEIS API 계약
+- `compose.yml`: 프론트엔드, 백엔드 및 MCP 서버 컨테이너 구성
 - `scripts`: Bash 및 PowerShell 실행·전체 테스트 스크립트
 
-AI 분석, MCP, 멀티 에이전트 및 데이터베이스 기능은 이후 워크숍 단계의
-범위이며 현재 급식 조회 MVP에 미리 추가하지 않습니다.
+AI 분석, 멀티 에이전트 및 데이터베이스 기능은 이후 워크숍 단계의 범위이며
+현재 급식 조회 MVP에 미리 추가하지 않습니다.
 
 ## 핵심 동작과 제약
 
@@ -27,13 +28,13 @@ AI 분석, MCP, 멀티 에이전트 및 데이터베이스 기능은 이후 워�
 - 백엔드는 NEIS 원본 필드를 내부 camelCase 응답 모델로 정규화합니다.
 - 급식 종류는 `MMEAL_SC_CODE=2`인 중식으로 고정합니다.
 - 검색어는 공백 제거 후 2자 이상이어야 합니다.
-- 조회 기간은 한국 표준시 기준 직전 달 1일부터 오늘까지입니다.
+- 백엔드와 MCP 서버의 조회 기간은 한국 표준시 기준 직전 달 1일부터 오늘까지입니다.
 - NEIS가 반환하지 않은 날짜는 프론트엔드에서 `급식 정보 없음` 카드로
   보완합니다.
 - 날짜 카드는 NEIS가 제공한 원산지, 영양 정보, 칼로리와 급식 인원을 함께
   표시합니다.
 - `NEIS_FIXTURE_MODE=true`는 실제 API 키와 NEIS 가용성에 의존하지 않는
-  로컬 데모 및 E2E 전용 모드입니다.
+  로컬 데모, MCP Inspector 확인 및 E2E 전용 모드입니다.
 
 ## 일반 작업 지침
 
@@ -88,13 +89,28 @@ AI 분석, MCP, 멀티 에이전트 및 데이터베이스 기능은 이후 워�
 - 공개 함수와 계층 경계에는 명확한 타입 힌트를 사용하고 광범위한 `Any`나
   무분별한 형 변환을 피합니다.
 
+## MCP 서버 지침
+
+- 공식 `mcp` Python SDK 1.x와 `FastMCP`를 사용하며 의존성 상한 `<2`를
+  유지합니다.
+- 서버는 `src/mcp`의 독립 Python 패키지로 관리하고 Streamable HTTP
+  `/mcp` endpoint를 제공합니다.
+- 학교 검색과 중식 조회는 구조화된 출력 모델을 반환하고 예상 가능한 실패는
+  `ToolError`로 변환해 MCP `isError` 응답으로 전달합니다.
+- NEIS API 키, 원본 오류, 전체 query string 및 민감 데이터는 도구 오류
+  응답이나 로그에 포함하지 않습니다.
+- 프로토콜 테스트는 공식 SDK의 인메모리 클라이언트 세션을 사용하고 외부 NEIS
+  HTTP 호출은 `respx` 또는 fixture 클라이언트로 대체합니다.
+- 로컬 MCP endpoint는 기본 `http://localhost:8001/mcp`이며 Inspector에서는
+  전송 방식으로 Streamable HTTP를 선택합니다.
+
 ## 의존성과 생성 파일
 
 - 프론트엔드 의존성은 `src/web/package.json`과 `package-lock.json`,
   E2E 의존성은 `src/e2e/package.json`과 `package-lock.json`으로
   관리합니다. 변경 시 npm 명령으로 잠금 파일을 함께 갱신합니다.
-- 백엔드 의존성은 `src/api/pyproject.toml`과 `uv.lock`으로 관리하며
-  `uv add` 또는 `uv remove`를 사용합니다.
+- 백엔드와 MCP 서버 의존성은 각 디렉터리의 `pyproject.toml`과 `uv.lock`으로
+  관리하며 `uv add` 또는 `uv remove`를 사용합니다.
 - 잠금 파일, OpenAPI 생성 타입 및 빌드 산출물을 수동으로 편집하지 않습니다.
 - 표준 라이브러리나 기존 의존성으로 해결 가능한 기능을 위해 새 패키지를
   추가하지 않습니다.
@@ -111,9 +127,16 @@ AI 분석, MCP, 멀티 에이전트 및 데이터베이스 기능은 이후 워�
 .\scripts\run-app.ps1
 ```
 
-스크립트는 Vite와 FastAPI 개발 서버를 직접 실행하고 `Ctrl+C` 입력 시 두
-프로세스를 모두 종료합니다. 실제 NEIS를 사용할 때는 `.env.example`을
+스크립트는 Vite, FastAPI 및 MCP 개발 서버를 직접 실행하고 `Ctrl+C` 입력 시
+세 프로세스를 모두 종료합니다. 실제 NEIS를 사용할 때는 `.env.example`을
 참고해 루트 `.env`에 `NEIS_API_KEY`를 설정합니다.
+
+MCP Inspector는 별도 터미널에서 실행하고 `http://localhost:8001/mcp`에
+연결합니다.
+
+```sh
+npx -y @modelcontextprotocol/inspector
+```
 
 전체 검증은 다음 스크립트를 우선 사용합니다.
 
@@ -125,14 +148,15 @@ AI 분석, MCP, 멀티 에이전트 및 데이터베이스 기능은 이후 워�
 .\scripts\run-test.ps1
 ```
 
-전체 테스트는 잠금 파일 기준 의존성을 복원하고 백엔드 pytest, 프론트엔드
-Vitest, fixture 모드 Compose 스택의 Playwright E2E를 실행한 뒤 스택을
-정리합니다.
+전체 테스트는 잠금 파일 기준 의존성을 복원하고 백엔드·MCP pytest,
+프론트엔드 Vitest, fixture 모드 Compose 스택의 Playwright E2E를 실행한 뒤
+스택을 정리합니다.
 
 변경 범위가 작을 때는 다음 명령으로 대상 검사만 먼저 실행할 수 있습니다.
 
 ```sh
 cd src/api && uv run pytest
+cd src/mcp && uv run pytest
 cd src/web && npm run lint && npm run build && npm test
 cd src/e2e && npm test
 docker compose config
@@ -150,8 +174,9 @@ docker compose config
   포함하지 않습니다.
 - `.env`, `.env.*`(예제 파일 제외), 개인 키 및 자격 증명 파일을 커밋하지
   않습니다.
-- `NEIS_API_KEY`는 백엔드 프로세스와 컨테이너에만 주입하고 `VITE_*`,
-  프론트엔드 번들 또는 브라우저 응답에 포함하지 않습니다.
+- `NEIS_API_KEY`는 백엔드와 MCP 서버 프로세스·컨테이너에만 주입하고
+  `VITE_*`, 프론트엔드 번들, 브라우저 응답 또는 MCP 도구 결과에 포함하지
+  않습니다.
 - 외부 입력과 NEIS 응답을 신뢰하지 않으며 최소 권한과 안전한 기본값을
   사용합니다.
 - 보안 취약점은 공개 이슈에 작성하지 않고 `SECURITY.md` 절차를 따릅니다.

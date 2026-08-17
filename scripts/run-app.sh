@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd -- "${SCRIPT_DIR}/.." && pwd)"
 BACKEND_PID=""
 FRONTEND_PID=""
+MCP_PID=""
 
 load_dotenv() {
   local env_file="$1"
@@ -43,8 +44,10 @@ cleanup() {
   trap - EXIT INT TERM
   stop_process_tree "${FRONTEND_PID}"
   stop_process_tree "${BACKEND_PID}"
+  stop_process_tree "${MCP_PID}"
   [[ -z "${FRONTEND_PID}" ]] || wait "${FRONTEND_PID}" 2>/dev/null || true
   [[ -z "${BACKEND_PID}" ]] || wait "${BACKEND_PID}" 2>/dev/null || true
+  [[ -z "${MCP_PID}" ]] || wait "${MCP_PID}" 2>/dev/null || true
 }
 
 trap cleanup EXIT
@@ -55,6 +58,7 @@ load_dotenv "${REPO_ROOT}/.env"
 
 BACKEND_PORT="${BACKEND_PORT:-8000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+MCP_PORT="${MCP_PORT:-8001}"
 export VITE_BACKEND_ORIGIN="${VITE_BACKEND_ORIGIN:-http://localhost:${BACKEND_PORT}}"
 
 if [[ -z "${NEIS_API_KEY:-}" && "${NEIS_FIXTURE_MODE:-false}" != "true" ]]; then
@@ -75,6 +79,14 @@ echo "==> 백엔드 시작: http://localhost:${BACKEND_PORT}"
 ) &
 BACKEND_PID=$!
 
+echo "==> MCP 서버 시작: http://localhost:${MCP_PORT}/mcp"
+(
+  cd "${REPO_ROOT}/src/mcp"
+  export MCP_PORT
+  exec uv run bsl-mcp
+) &
+MCP_PID=$!
+
 echo "==> 프론트엔드 시작: http://localhost:${FRONTEND_PORT}"
 (
   cd "${REPO_ROOT}/src/web"
@@ -82,15 +94,18 @@ echo "==> 프론트엔드 시작: http://localhost:${FRONTEND_PORT}"
 ) &
 FRONTEND_PID=$!
 
-echo "CTRL+C를 누르면 두 앱을 모두 종료합니다."
+echo "CTRL+C를 누르면 모든 앱을 종료합니다."
 
 while kill -0 "${BACKEND_PID}" 2>/dev/null &&
+  kill -0 "${MCP_PID}" 2>/dev/null &&
   kill -0 "${FRONTEND_PID}" 2>/dev/null; do
   sleep 1
 done
 
 if ! kill -0 "${BACKEND_PID}" 2>/dev/null; then
   wait "${BACKEND_PID}"
+elif ! kill -0 "${MCP_PID}" 2>/dev/null; then
+  wait "${MCP_PID}"
 else
   wait "${FRONTEND_PID}"
 fi

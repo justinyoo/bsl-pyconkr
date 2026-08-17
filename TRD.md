@@ -3,14 +3,14 @@
 | 항목 | 내용 |
 | --- | --- |
 | 문서 상태 | 승인 (Approved) |
-| 버전 | 1.2 |
+| 버전 | 1.3 |
 | 제품명 | 급식 배틀 - 학교 급식 조회 앱 |
-| 기준 PRD | [`PRD.md` v1.1](./PRD.md) |
+| 기준 PRD | [`PRD.md` v1.2](./PRD.md) |
 | 작성자 | 프로젝트 팀 |
 | 작성일 | 2026-08-17 |
 | 최종 수정일 | 2026-08-17 |
 | 대상 릴리스 | MVP |
-| 관련 이슈 | [GitHub Issue #4](https://github.com/justinyoo/bsl-pyconkr/issues/4), [GitHub Issue #5](https://github.com/justinyoo/bsl-pyconkr/issues/5) |
+| 관련 이슈 | [GitHub Issue #4](https://github.com/justinyoo/bsl-pyconkr/issues/4), [GitHub Issue #5](https://github.com/justinyoo/bsl-pyconkr/issues/5), [GitHub Issue #8](https://github.com/justinyoo/bsl-pyconkr/issues/8) |
 | 외부 API 명세 | [`data/openapi.json`](./data/openapi.json) |
 | 내부 API 명세 | [`src/openapi.json`](./src/openapi.json) |
 
@@ -22,13 +22,14 @@
 | 1.0 | 2026-08-17 | 기술 설계 검토 완료 및 승인 | 프로젝트 팀 |
 | 1.1 | 2026-08-17 | Python 패키지 관리와 애플리케이션 실행 도구를 `uv`로 명시 | 프로젝트 팀 |
 | 1.2 | 2026-08-17 | 구현 결과에 맞춰 단일 URL 상태, 저장소 구조, 실행 스크립트, 로깅 및 테스트 현황 반영 | 프로젝트 팀 |
+| 1.3 | 2026-08-17 | 공식 MCP SDK 1.x 기반 Streamable HTTP 서버, 도구, 오류 처리 및 Compose 통합 추가 | 프로젝트 팀 |
 
 ## 1. 문서 목적
 
 이 문서는 승인된 `PRD.md`를 구현하기 위한 기술 구조와 책임을 정의한다.
-애플리케이션은 React 기반 프론트엔드와 Python 기반 백엔드로 구성한다. 로컬
-개발에서는 통합 스크립트가 두 개발 서버를 직접 실행하고, 컨테이너 통합 검증과
-배포 형태의 실행에는 Docker Compose를 사용한다.
+애플리케이션은 React 기반 프론트엔드, Python 기반 백엔드와 독립 Python MCP
+서버로 구성한다. 로컬 개발에서는 통합 스크립트가 세 개발 서버를 직접 실행하고,
+컨테이너 통합 검증과 배포 형태의 실행에는 Docker Compose를 사용한다.
 
 외부 NEIS 계약과 내부 애플리케이션 계약은 다음과 같이 분리한다.
 
@@ -67,6 +68,7 @@
 | Date Picker | React DayPicker 기반 범위 선택 컴포넌트 | 접근 가능한 키보드 탐색과 날짜 범위 선택 지원 |
 | 스타일 | CSS Modules 또는 전역 디자인 토큰 | Bento Grid와 네오 브루탈리즘을 불필요한 UI 프레임워크 종속 없이 구현 |
 | 백엔드 | FastAPI, Pydantic | OpenAPI 친화적이며 입력 검증과 비동기 HTTP API 구현에 적합 |
+| MCP 서버 | 공식 MCP Python SDK `>=1.29,<2`, FastMCP | MCP 1.x 호환, 구조화된 도구 출력과 Streamable HTTP 지원 |
 | 외부 HTTP | HTTPX | 비동기 요청, 타임아웃, 테스트 대체가 용이 |
 | Python 실행 | Python 3.12, `uv run` | 가상 환경을 직접 활성화하지 않고 잠긴 환경에서 명령 실행 |
 | 패키지 관리 | npm, Python `uv` + `pyproject.toml` + `uv.lock` | 재현 가능한 의존성 해석과 로컬·CI·컨테이너 환경의 일관성 보장 |
@@ -83,6 +85,8 @@ flowchart LR
     U[사용자 브라우저] --> W[React Web]
     W -->|/api/v1/* JSON| A[FastAPI Backend]
     A -->|data/openapi.json 계약| N[NEIS 공개 API]
+    C[MCP Client] -->|Streamable HTTP /mcp| M[MCP Server]
+    M -->|data/openapi.json 계약| N
     S[src/openapi.json] -. 타입 생성 .-> W
     S -. 계약 검증 .-> A
 ```
@@ -98,10 +102,20 @@ flowchart LR
 7. 백엔드는 `<br/>` 기반 문자열과 숫자 필드를 내부 모델로 정규화해 반환한다.
 8. 프론트엔드는 누락된 날짜를 계산하여 "급식 정보 없음" 카드를 표시한다.
 
+MCP 클라이언트 흐름은 다음과 같다.
+
+1. MCP 클라이언트가 Streamable HTTP `/mcp`에 연결하고 도구 목록을 조회한다.
+2. `search_schools`가 NEIS 학교 기본 정보 API를 호출해 후보를 정규화한다.
+3. 클라이언트가 선택한 교육청 코드와 학교 코드를 날짜 범위와 함께
+   `get_school_lunches`에 전달한다.
+4. MCP 서버가 중식 조건으로 NEIS 급식 API를 호출하고 구조화된 결과 또는
+   `isError=true` 도구 오류를 반환한다.
+
 ### 4.2 신뢰 경계
 
 - 브라우저 입력과 NEIS 응답은 모두 신뢰하지 않고 검증한다.
-- `NEIS_API_KEY`는 백엔드 환경 변수로만 주입한다.
+- `NEIS_API_KEY`는 백엔드와 MCP 서버 환경 변수로만 주입하고 브라우저나 MCP
+  도구 결과에 노출하지 않는다.
 - 프론트엔드 번들, URL, 로그 또는 API 응답에 비밀 값을 포함하지 않는다.
 - 백엔드는 외부 오류를 내부 표준 오류 형식으로 변환하고 원시 응답 전체를
   사용자에게 노출하지 않는다.
@@ -144,6 +158,16 @@ flowchart LR
 - `INFO-200`은 정상적인 빈 결과로 변환
 - 인증, 요청 제한, 서비스 장애 등은 구체적인 외부 서비스 예외로 전달
 
+### 5.4 MCP 서버
+
+- 백엔드와 별도인 `src/mcp` Python 패키지 및 프로세스로 실행
+- 공식 `mcp` SDK 1.x의 `FastMCP`와 Streamable HTTP `/mcp` 전송 사용
+- `search_schools`: 학교명 일부로 학교·교육청·지역·식별 코드 반환
+- `get_school_lunches`: 교육청 코드, 학교 코드와 기간으로 중식 정보 반환
+- Pydantic 모델 기반 구조화된 출력과 자동 생성 input/output schema 제공
+- 입력 오류, 빈 결과와 NEIS 인증·제한·응답·가용성 오류를 `ToolError`로 변환
+- 도구 오류에는 원본 응답, API 키, query string 및 내부 예외를 포함하지 않음
+
 ## 6. 저장소 구조
 
 애플리케이션 코드와 테스트 코드는 모두 `src/` 아래에 둔다. 저장소 루트에는
@@ -175,6 +199,12 @@ flowchart LR
 │   │   ├── tests/
 │   │   │   ├── unit/
 │   │   │   └── integration/
+│   │   ├── Dockerfile
+│   │   ├── pyproject.toml
+│   │   └── uv.lock
+│   ├── mcp/                 # 독립 Streamable HTTP MCP 서버
+│   │   ├── src/bsl_mcp/     # 도구, 서비스, 모델, NEIS 클라이언트
+│   │   ├── tests/           # 단위 및 MCP 프로토콜 통합 테스트
 │   │   ├── Dockerfile
 │   │   ├── pyproject.toml
 │   │   └── uv.lock
@@ -673,6 +703,8 @@ NEIS 클라이언트 인터페이스에 의존해 단위 테스트에서 교체�
 | `NEIS_FIXTURE_MODE` | 아니요 | `false` | 로컬 데모와 E2E용 고정 응답 모드 |
 | `CORS_ALLOWED_ORIGINS` | 아니요 | 로컬 프론트엔드 origin | 쉼표 구분 허용 origin |
 | `LOG_LEVEL` | 아니요 | `INFO` | `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL` 중 애플리케이션 로그 수준 |
+| `MCP_HOST` | 아니요 | `0.0.0.0` | MCP Streamable HTTP 바인딩 호스트 |
+| `MCP_PORT` | 아니요 | `8001` | MCP Streamable HTTP 포트 |
 
 애플리케이션 시작 시 필수 설정을 검증한다. 누락된 API 키를 요청 시점까지 숨기지
 않고 명확한 시작 오류로 처리한다.
@@ -718,34 +750,52 @@ uv run fastapi run src/bsl_api/main.py --host 0.0.0.0 --port 8000
 경계를 사용한다. `pyproject.toml`의 `[project.requires-python]`은 Python 3.12
 호환 범위를 선언하고 `.python-version`을 추가하는 경우 `3.12`로 고정한다.
 
+### 10.5 MCP 패키지와 실행
+
+MCP 서버는 `src/mcp`에서 별도 `pyproject.toml`과 `uv.lock`을 사용한다. 공식
+SDK의 유지보수 중인 1.x 대 버전을 고정하기 위해 `mcp>=1.29,<2` 범위를
+선언한다.
+
+```bash
+cd src/mcp
+uv sync --locked
+uv run bsl-mcp
+```
+
+기본 endpoint는 `http://localhost:8001/mcp`이며 Inspector는
+`npx -y @modelcontextprotocol/inspector`로 실행한다.
+
 ## 11. 통합 실행 스크립트와 Docker Compose
 
 ### 11.1 로컬 직접 실행
 
 저장소 루트의 `scripts/run-app.sh`와 `scripts/run-app.ps1`은 Docker를 거치지
-않고 `uv run fastapi dev`와 `npm run dev`를 함께 실행한다. 한 프로세스가
-종료되거나 사용자가 `Ctrl+C`를 입력하면 남은 프론트엔드·백엔드 프로세스 트리도
+않고 `uv run fastapi dev`, `uv run bsl-mcp`와 `npm run dev`를 함께 실행한다.
+한 프로세스가 종료되거나 사용자가 `Ctrl+C`를 입력하면 남은 프로세스 트리도
 종료한다. 루트 `.env` 값은 이미 설정된 프로세스 환경 변수를 덮어쓰지 않는다.
 
-`scripts/run-test.sh`와 `scripts/run-test.ps1`은 백엔드 pytest, 프론트엔드
-Vitest, fixture Compose 스택의 Playwright E2E를 순차 실행하고 종료 시 스택을
-정리한다.
+`scripts/run-test.sh`와 `scripts/run-test.ps1`은 백엔드·MCP pytest,
+프론트엔드 Vitest, fixture Compose 스택의 Playwright E2E를 순차 실행하고
+종료 시 스택을 정리한다.
 
 ### 11.2 Docker Compose
 
-Compose는 최소 두 서비스를 제공한다.
+Compose는 세 서비스를 제공한다.
 
 | 서비스 | 역할 | 외부 노출 |
 | --- | --- | --- |
 | `frontend` | React 정적 앱과 `/api` reverse proxy | `5173` 또는 문서화된 단일 웹 포트 |
 | `backend` | FastAPI 내부 API | 개발 시에만 선택적으로 노출 |
+| `mcp` | 학교 검색·중식 조회 MCP 도구 | Streamable HTTP `8001/mcp` |
 
 - `frontend`는 브라우저의 `/api/v1/*` 요청을 `backend`로 프록시한다.
 - 서비스 간 통신에는 Compose 서비스명과 내부 포트를 사용한다.
-- `NEIS_API_KEY`는 backend에만 주입한다.
+- `NEIS_API_KEY`는 backend와 mcp 서버에만 주입한다.
 - 각 서비스에 healthcheck를 정의하고 frontend는 backend 준비 상태에 의존한다.
 - `.env`는 커밋하지 않고 비밀 값이 없는 `.env.example`만 제공한다.
 - backend 이미지는 `pyproject.toml`과 `uv.lock`을 먼저 복사한 뒤
+  `uv sync --locked --no-dev`로 의존성을 설치한다.
+- mcp 이미지도 독립 `pyproject.toml`과 `uv.lock`을 사용해
   `uv sync --locked --no-dev`로 의존성을 설치한다.
 - backend 컨테이너는 `uv run fastapi run src/bsl_api/main.py --host 0.0.0.0
   --port 8000`을 실행하며 개발용 reload를 사용하지 않는다.
@@ -759,6 +809,7 @@ Compose는 최소 두 서비스를 제공한다.
 | 프론트엔드 통합 | **Vitest + React Testing Library + MSW** | Vite와 빠르게 통합되고 사용자 관점 DOM 검증 및 HTTP 모킹 가능 |
 | 백엔드 단위 | **pytest** | Python 표준에 가까운 간결한 fixture·parameterization 제공 |
 | 백엔드 통합 | **pytest + FastAPI TestClient/HTTPX + respx** | 실제 라우팅·검증을 실행하면서 NEIS HTTP 경계를 결정적으로 대체 |
+| MCP 단위·통합 | **pytest + 공식 MCP 인메모리 세션 + respx** | 도구 schema·호출·오류와 NEIS HTTP 경계를 프로토콜 수준에서 검증 |
 | E2E | **Playwright** | Chromium 기반 실제 브라우저에서 Date Picker와 반응형 흐름 검증 가능 |
 
 이 조합을 사용한다. Jest는 Vite 환경에서 Vitest와 역할이 중복되고,
@@ -804,7 +855,15 @@ MSW 응답은 `src/openapi.json`의 예제와 스키마를 기준으로 작성�
 `respx`로 HTTPX의 NEIS 호출만 대체하고 FastAPI 앱과 실제 라우팅·Pydantic
 검증은 실행한다.
 
-### 12.5 E2E 테스트
+### 12.5 MCP 서버 테스트
+
+- 인메모리 MCP 클라이언트 세션으로 두 도구의 목록과 input/output schema 조회
+- 학교 검색 및 중식 조회의 구조화된 성공 결과 검증
+- 잘못된 입력, 학교·급식 없음과 NEIS 오류의 `isError=true` 응답 검증
+- `respx`로 실제 NEIS 요청 파라미터와 중식 코드 `MMEAL_SC_CODE=2` 검증
+- 오류 결과에 API 키와 원본 예외 메시지가 포함되지 않는지 검증
+
+### 12.6 E2E 테스트
 
 Docker Compose로 전체 서비스를 실행한 뒤 Playwright에서 다음 핵심 경로를
 검증한다.
@@ -820,7 +879,7 @@ Docker Compose로 전체 서비스를 실행한 뒤 Playwright에서 다음 핵�
 탐색으로 주요 행동을 수행할 수 있는지 검증한다. E2E는 NEIS의 가용성에
 의존하지 않도록 백엔드를 고정 fixture 모드로 실행하거나 외부 호출을 대체한다.
 
-### 12.6 계약 검증
+### 12.7 계약 검증
 
 - `src/openapi.json` 자체를 OpenAPI validator로 검사한다.
 - 프론트엔드 타입은 명세에서 생성하며 수동 복제하지 않는다.
@@ -834,12 +893,14 @@ Docker Compose로 전체 서비스를 실행한 뒤 Playwright에서 다음 핵�
 2. 프론트엔드 타입 검사, 빌드, 통합 테스트
 3. `uv sync --locked` 후 백엔드 린트·타입 검사(프로젝트에 도입된 경우),
    단위·통합 테스트를 `uv run`으로 실행
-4. `docker compose config`
-5. 핵심 Playwright E2E
+4. MCP 서버 `uv sync --locked` 및 `uv run pytest`
+5. `docker compose config`
+6. 핵심 Playwright E2E
 
-CI 작업 디렉터리는 프론트엔드 `src/web/`, 백엔드 `src/api/`, E2E
-`src/e2e/`를 사용하도록 구성한다. 기존 명령인 `npm run build`, `npm test`,
-`uv run pytest`, `docker compose config`는 유지한다. CI는 `uv.lock`이
+CI 작업 디렉터리는 프론트엔드 `src/web/`, 백엔드 `src/api/`, MCP
+`src/mcp/`, E2E `src/e2e/`를 사용하도록 구성한다. 기존 명령인
+`npm run build`, `npm test`, `uv run pytest`, `docker compose config`는
+유지한다. CI는 `uv.lock`이
 `pyproject.toml`과 일치하지 않으면 실패해야 하며 잠금 파일을 자동 갱신하지
 않는다. 추가 검사 도구는 구현 단계에서 실제 의존성과 스크립트를 함께 추가한
 후에만 CI에서 실행한다.
@@ -852,6 +913,7 @@ CI 작업 디렉터리는 프론트엔드 `src/web/`, 백엔드 `src/api/`, E2E
 | FR-07~12 날짜 선택 | React DayPicker 래퍼, 내부 단계 상태, 범위 요약·초기화, 프론트·백엔드 이중 검증 |
 | FR-13~19 급식 결과 | 중식 endpoint, NEIS 급식 매핑, 부가 정보와 날짜별 Bento 카드, 재선택 |
 | FR-20~25 상태·오류 | TanStack Query 상태·재시도, `ProblemDetail`, 외부 오류 매핑 |
+| FR-26~31 MCP 서버 | Streamable HTTP `/mcp`, 학교 검색·중식 조회 도구, 구조화된 출력, `ToolError` 오류 매핑 |
 | UI·반응형·접근성 | 디자인 토큰, CSS Grid, Date Picker 키보드 지원, Playwright |
 
 ## 15. 구현 인수 조건
@@ -863,12 +925,15 @@ CI 작업 디렉터리는 프론트엔드 `src/web/`, 백엔드 `src/api/`, E2E
 - [x] 프론트엔드 API 타입이 `src/openapi.json`에서 생성되고 클라이언트가 이를
       사용한다.
 - [x] 학교 검색과 중식 응답이 외부 NEIS 필드에서 내부 모델로 정규화된다.
-- [x] 역순 또는 직전 달 1일~오늘을 벗어난 날짜 범위를 프론트엔드와 백엔드
-      모두 거부한다.
+- [x] 역순 또는 직전 달 1일~오늘을 벗어난 날짜 범위를 프론트엔드, 백엔드와
+      MCP 서버가 모두 거부한다.
 - [x] 중식 조회에 `MMEAL_SC_CODE=2`가 강제된다.
-- [x] `NEIS_API_KEY`가 백엔드 외부에 노출되지 않는다.
+- [x] `NEIS_API_KEY`가 백엔드와 MCP 서버 외부에 노출되지 않는다.
 - [x] Python 의존성이 `pyproject.toml`과 커밋된 `uv.lock`으로 관리되며 로컬,
       CI와 컨테이너에서 `uv sync --locked` 및 `uv run`을 사용한다.
-- [x] 프론트엔드 통합 테스트, 백엔드 단위·통합 테스트와 Playwright E2E가
+- [x] 프론트엔드 통합 테스트, 백엔드·MCP 단위·통합 테스트와 Playwright E2E가
       핵심 사용자 흐름을 검증한다.
-- [x] Docker Compose로 프론트엔드와 백엔드를 함께 빌드하고 실행할 수 있다.
+- [x] Docker Compose로 프론트엔드, 백엔드와 MCP 서버를 함께 빌드하고 실행할
+      수 있다.
+- [x] 공식 MCP SDK 1.x 기반 Streamable HTTP 서버가 학교 검색과 중식 조회
+      도구를 제공하며 Docker Compose에 포함된다.

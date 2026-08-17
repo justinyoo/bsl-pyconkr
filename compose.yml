@@ -24,6 +24,32 @@ services:
       retries: 5
       start_period: 5s
 
+  mcp:
+    build:
+      context: ./src/mcp
+    environment:
+      NEIS_API_KEY: ${NEIS_API_KEY:-}
+      NEIS_BASE_URL: ${NEIS_BASE_URL:-https://open.neis.go.kr}
+      NEIS_TIMEOUT_SECONDS: ${NEIS_TIMEOUT_SECONDS:-15}
+      NEIS_FIXTURE_MODE: ${NEIS_FIXTURE_MODE:-false}
+      MCP_HOST: 0.0.0.0
+      MCP_PORT: 8001
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "${MCP_PORT:-8001}:8001"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; socket.create_connection(('127.0.0.1', 8001), 3).close()",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+
   frontend:
     build:
       context: ./src/web
