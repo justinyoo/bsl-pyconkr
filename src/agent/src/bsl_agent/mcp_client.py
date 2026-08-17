@@ -16,6 +16,8 @@ from bsl_agent.models import School, SchoolMealsResult, SchoolSearchResult
 class MealGateway(Protocol):
     async def list_random_schools(self, count: int = 10) -> SchoolSearchResult: ...
 
+    async def search_schools(self, school_name: str) -> SchoolSearchResult: ...
+
     async def get_school_lunch(
         self, school: School, meal_date: date
     ) -> SchoolMealsResult: ...
@@ -60,6 +62,13 @@ class McpMealGateway:
     async def list_random_schools(self, count: int = 10) -> SchoolSearchResult:
         async with self._session() as session:
             result = await session.call_tool("list_random_schools", {"count": count})
+        return SchoolSearchResult.model_validate(self._structured(result))
+
+    async def search_schools(self, school_name: str) -> SchoolSearchResult:
+        async with self._session() as session:
+            result = await session.call_tool(
+                "search_schools", {"school_name": school_name}
+            )
         return SchoolSearchResult.model_validate(self._structured(result))
 
     async def get_school_lunch(

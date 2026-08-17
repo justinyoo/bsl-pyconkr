@@ -31,6 +31,12 @@ class FixtureGateway:
     async def list_random_schools(self, count: int = 10) -> SchoolSearchResult:
         return SchoolSearchResult(schools=self.schools[:count], total=count)
 
+    async def search_schools(self, school_name: str) -> SchoolSearchResult:
+        schools = [
+            school for school in self.schools if school.school_name == school_name
+        ]
+        return SchoolSearchResult(schools=schools, total=len(schools))
+
     async def get_school_lunch(
         self, school: School, meal_date: date
     ) -> SchoolMealsResult:
@@ -122,6 +128,26 @@ async def test_workflow_evaluates_available_school_without_declaring_winner() ->
     assert result.improvements == {
         "school-2": ["부족한 식품군을 보완해 구성을 다양화하세요."]
     }
+
+
+@pytest.mark.anyio
+async def test_workflow_accepts_frontend_natural_language_input() -> None:
+    gateway = FixtureGateway()
+    runtime = EvaluationRuntime(gateway=gateway, model=None, fixture_mode=True)
+    workflow = build_workflow(runtime)
+    request = (
+        f"{date.today().isoformat()}의 예시학교 1(서울특별시)과 "
+        "예시학교 2(서울특별시) 중식을 평가 루브릭에 따라 비교해 주세요."
+    )
+
+    run_result = await workflow.run([Message(role="user", contents=[request])])
+    result = BattleEvaluation.model_validate_json(run_result.get_outputs()[0])
+
+    assert [score.school.school_code for score in result.school_scores] == [
+        "school-1",
+        "school-2",
+    ]
+    assert result.outcome == "second"
 
 
 @pytest.mark.anyio
