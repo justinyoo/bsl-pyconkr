@@ -67,6 +67,7 @@ try {
 
     $BackendPort = if ($env:BACKEND_PORT) { $env:BACKEND_PORT } else { "8000" }
     $FrontendPort = if ($env:FRONTEND_PORT) { $env:FRONTEND_PORT } else { "5173" }
+    $McpPort = if ($env:MCP_PORT) { $env:MCP_PORT } else { "8001" }
     if (-not $env:VITE_BACKEND_ORIGIN) {
         $env:VITE_BACKEND_ORIGIN = "http://localhost:$BackendPort"
     }
@@ -100,6 +101,12 @@ try {
         ) -NoNewWindow -PassThru
     $Processes.Add($Backend)
 
+    Write-Host "==> MCP 서버 시작: http://localhost:$McpPort/mcp"
+    $env:MCP_PORT = $McpPort
+    $Mcp = Start-Process -FilePath $UvCommand -WorkingDirectory "src/mcp" `
+        -ArgumentList @("run", "bsl-mcp") -NoNewWindow -PassThru
+    $Processes.Add($Mcp)
+
     Write-Host "==> 프론트엔드 시작: http://localhost:$FrontendPort"
     $Frontend = Start-Process -FilePath $NpmCommand -WorkingDirectory "src/web" `
         -ArgumentList @(
@@ -108,13 +115,23 @@ try {
         ) -NoNewWindow -PassThru
     $Processes.Add($Frontend)
 
-    Write-Host "CTRL+C를 누르면 두 앱을 모두 종료합니다."
+    Write-Host "CTRL+C를 누르면 모든 앱을 종료합니다."
 
-    while (-not $Backend.HasExited -and -not $Frontend.HasExited) {
+    while (
+        -not $Backend.HasExited -and
+        -not $Mcp.HasExited -and
+        -not $Frontend.HasExited
+    ) {
         Start-Sleep -Milliseconds 500
     }
 
-    $StoppedProcess = if ($Backend.HasExited) { $Backend } else { $Frontend }
+    $StoppedProcess = if ($Backend.HasExited) {
+        $Backend
+    } elseif ($Mcp.HasExited) {
+        $Mcp
+    } else {
+        $Frontend
+    }
     if ($StoppedProcess.ExitCode -ne 0) {
         throw "앱 프로세스가 종료 코드 $($StoppedProcess.ExitCode)로 종료되었습니다."
     }
