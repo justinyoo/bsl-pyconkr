@@ -88,6 +88,10 @@ async def test_workflow_runs_three_evaluators_and_preserves_weighted_scores() ->
     assert result.outcome == "second"
     assert result.winner_school_code == "school-2"
     assert result.unavailable_schools == []
+    assert result.improvements == {
+        "school-1": ["부족한 식품군을 보완해 구성을 다양화하세요."],
+        "school-2": ["부족한 식품군을 보완해 구성을 다양화하세요."],
+    }
 
 
 @pytest.mark.anyio
@@ -115,6 +119,9 @@ async def test_workflow_evaluates_available_school_without_declaring_winner() ->
     assert result.outcome == "incomplete"
     assert result.winner_school_code is None
     assert result.unavailable_schools == [gateway.schools[0]]
+    assert result.improvements == {
+        "school-2": ["부족한 식품군을 보완해 구성을 다양화하세요."]
+    }
 
 
 @pytest.mark.anyio

@@ -85,10 +85,7 @@ class FixtureFinalAgent:
         payload = _json_after_marker(prompt, marker)
         if not isinstance(payload, dict):
             raise ValueError("fixture 최종 평가 입력이 올바르지 않습니다.")
-        school_codes = [
-            score["school"]["schoolCode"] for score in payload["schoolScores"]
-        ]
-        incomplete = len(school_codes) == 1
+        incomplete = len(payload["schoolScores"]) == 1
         return json.dumps(
             {
                 "summary": (
@@ -103,10 +100,6 @@ class FixtureFinalAgent:
                         else "영양 균형, 건강성, 메뉴 품질의 가중 점수를 비교했습니다."
                     )
                 ],
-                "improvements": {
-                    code: ["확인 가능한 영양 정보와 식품군 구성을 보완하세요."]
-                    for code in school_codes
-                },
                 "warnings": ["이 평가는 영양사의 전문 진단을 대체하지 않습니다."],
             },
             ensure_ascii=False,

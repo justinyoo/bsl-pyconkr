@@ -131,7 +131,6 @@ class ScoredEvaluation(ApiModel):
 class FinalNarrative(ApiModel):
     summary: Annotated[str, Field(min_length=1)]
     key_reasons: Annotated[list[str], Field(min_length=1)]
-    improvements: dict[str, list[str]]
     warnings: list[str] = Field(default_factory=list)
 
 

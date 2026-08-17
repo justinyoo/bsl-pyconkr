@@ -251,7 +251,7 @@ class FinalEvaluatorExecutor(Executor):
 - 모순, 근거 부족, 수치가 없는 항목에 대한 과도한 추정을 warnings에 표시합니다.
 - 애플리케이션이 계산한 rating, weightedScore, totalScore, outcome은 절대로 변경하지 않습니다.
 - 두 학교 점수가 있으면 승자 또는 동점의 핵심 이유를 작성합니다.
-- 한 학교의 급식만 있으면 승패를 판단하지 않고 해당 학교의 분석과 개선안을 작성합니다.
+- 한 학교의 급식만 있으면 승패를 판단하지 않고 해당 학교의 분석 결과를 작성합니다.
 
 반드시 아래 JSON Schema에 맞는 JSON 객체 하나만 반환하세요:
 {json.dumps(FinalNarrative.model_json_schema(), ensure_ascii=False)}
@@ -265,11 +265,16 @@ DATA_LIMITS={DATA_LIMITS}
         narrative = FinalNarrative.model_validate_json(
             _json_object(await self._agent.run_text(prompt))
         )
-        expected_codes = {
-            school_score.school.school_code for school_score in scored.school_scores
+        improvements = {
+            school_score.school.school_code: list(
+                dict.fromkeys(
+                    improvement
+                    for criterion in school_score.criteria
+                    for improvement in criterion.improvements
+                )
+            )
+            for school_score in scored.school_scores
         }
-        if set(narrative.improvements) != expected_codes:
-            raise ValueError("최종 평가의 개선안이 분석 가능한 학교와 일치해야 합니다.")
         winner_code = (
             None
             if scored.outcome in {"tie", "incomplete"}
@@ -284,7 +289,7 @@ DATA_LIMITS={DATA_LIMITS}
             winner_school_code=winner_code,
             summary=narrative.summary,
             key_reasons=narrative.key_reasons,
-            improvements=narrative.improvements,
+            improvements=improvements,
             warnings=narrative.warnings,
         )
         await ctx.yield_output(result.model_dump_json(by_alias=True))
