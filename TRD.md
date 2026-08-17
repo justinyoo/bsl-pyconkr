@@ -3,7 +3,7 @@
 | 항목 | 내용 |
 | --- | --- |
 | 문서 상태 | 승인 (Approved) |
-| 버전 | 1.0 |
+| 버전 | 1.1 |
 | 제품명 | 급식 배틀 - 학교 급식 조회 앱 |
 | 기준 PRD | [`PRD.md` v1.0](./PRD.md) |
 | 작성자 | 프로젝트 팀 |
@@ -20,6 +20,7 @@
 | --- | --- | --- | --- |
 | 0.1 | 2026-08-17 | 최초 기술 설계, 내부 API 계약 및 테스트 전략 작성 | 프로젝트 팀 |
 | 1.0 | 2026-08-17 | 기술 설계 검토 완료 및 승인 | 프로젝트 팀 |
+| 1.1 | 2026-08-17 | Python 패키지 관리와 애플리케이션 실행 도구를 `uv`로 명시 | 프로젝트 팀 |
 
 ## 1. 문서 목적
 
@@ -65,8 +66,8 @@
 | 스타일 | CSS Modules 또는 전역 디자인 토큰 | Bento Grid와 네오 브루탈리즘을 불필요한 UI 프레임워크 종속 없이 구현 |
 | 백엔드 | FastAPI, Pydantic | OpenAPI 친화적이며 입력 검증과 비동기 HTTP API 구현에 적합 |
 | 외부 HTTP | HTTPX | 비동기 요청, 타임아웃, 테스트 대체가 용이 |
-| Python 실행 | Python 3.12 | 저장소 CI 기준과 일치 |
-| 패키지 관리 | npm, Python `pyproject.toml` + pip | 저장소 CI와 기여 가이드에 이미 정의된 방식 |
+| Python 실행 | Python 3.12, `uv run` | 가상 환경을 직접 활성화하지 않고 잠긴 환경에서 명령 실행 |
+| 패키지 관리 | npm, Python `uv` + `pyproject.toml` + `uv.lock` | 재현 가능한 의존성 해석과 로컬·CI·컨테이너 환경의 일관성 보장 |
 | 오케스트레이션 | Docker Compose | 프론트엔드와 백엔드를 단일 명령으로 빌드·실행 |
 
 React DayPicker는 화면에 직접 노출되는 제품 컴포넌트가 아니라 Date Picker를
@@ -168,7 +169,8 @@ flowchart LR
 │   │   │   ├── unit/
 │   │   │   └── integration/
 │   │   ├── Dockerfile
-│   │   └── pyproject.toml
+│   │   ├── pyproject.toml
+│   │   └── uv.lock
 │   ├── e2e/                 # Playwright E2E 프로젝트
 │   └── openapi.json         # 프론트엔드-백엔드 내부 계약
 ├── data/
@@ -670,6 +672,37 @@ NEIS 클라이언트 인터페이스에 의존해 단위 테스트에서 교체�
 - API 키, 전체 query string과 민감 헤더를 로그에 기록하지 않는다.
 - 광범위한 예외를 성공 응답이나 빈 목록으로 바꾸지 않는다.
 
+### 10.4 Python 패키지 관리와 애플리케이션 실행
+
+백엔드의 Python 프로젝트·가상 환경·의존성 관리는 `uv`로 통일한다. `pip`,
+`pip-tools`, Poetry 또는 별도의 `requirements.txt`를 함께 사용하지 않는다.
+
+- 런타임 및 개발 의존성은 `src/api/pyproject.toml`에 선언한다.
+- 해석된 전체 의존성은 `src/api/uv.lock`에 잠그고 저장소에 커밋한다.
+- 의존성 추가와 제거에는 각각 `uv add <package>`, `uv remove <package>`를
+  사용한다. 개발 전용 의존성은 `uv add --dev <package>`로 구분한다.
+- 최초 설정과 잠금 파일 변경 후에는 `src/api/`에서 `uv sync --locked`를
+  실행한다. CI와 컨테이너 빌드도 잠금 파일을 변경하지 않는 이 명령을 사용한다.
+- Python 명령은 가상 환경을 직접 활성화하지 않고 모두 `uv run`으로 실행한다.
+
+로컬 개발 서버의 표준 실행 명령은 다음과 같다.
+
+```bash
+cd src/api
+uv sync --locked
+uv run fastapi dev src/bsl_api/main.py --host 0.0.0.0 --port 8000
+```
+
+배포용 프로세스는 reload를 사용하지 않으며 다음 명령으로 실행한다.
+
+```bash
+uv run fastapi run src/bsl_api/main.py --host 0.0.0.0 --port 8000
+```
+
+테스트, 린트와 타입 검사 등 백엔드 도구도 `uv run pytest`와 같이 동일한 실행
+경계를 사용한다. `pyproject.toml`의 `[project.requires-python]`은 Python 3.12
+호환 범위를 선언하고 `.python-version`을 추가하는 경우 `3.12`로 고정한다.
+
 ## 11. Docker Compose
 
 Compose는 최소 두 서비스를 제공한다.
@@ -684,6 +717,10 @@ Compose는 최소 두 서비스를 제공한다.
 - `NEIS_API_KEY`는 backend에만 주입한다.
 - 각 서비스에 healthcheck를 정의하고 frontend는 backend 준비 상태에 의존한다.
 - `.env`는 커밋하지 않고 비밀 값이 없는 `.env.example`만 제공한다.
+- backend 이미지는 `pyproject.toml`과 `uv.lock`을 먼저 복사한 뒤
+  `uv sync --locked --no-dev`로 의존성을 설치한다.
+- backend 컨테이너는 `uv run fastapi run src/bsl_api/main.py --host 0.0.0.0
+  --port 8000`을 실행하며 개발용 reload를 사용하지 않는다.
 
 ## 12. 테스트 전략과 권장 프레임워크
 
@@ -764,14 +801,17 @@ Docker Compose로 전체 서비스를 실행한 뒤 Playwright에서 다음 핵�
 
 1. 내부 OpenAPI 문법 및 스키마 검증
 2. 프론트엔드 타입 검사, 빌드, 통합 테스트
-3. 백엔드 린트·타입 검사(프로젝트에 도입된 경우), 단위·통합 테스트
+3. `uv sync --locked` 후 백엔드 린트·타입 검사(프로젝트에 도입된 경우),
+   단위·통합 테스트를 `uv run`으로 실행
 4. `docker compose config`
 5. 핵심 Playwright E2E
 
 CI 작업 디렉터리는 프론트엔드 `src/web/`, 백엔드 `src/api/`, E2E
 `src/e2e/`를 사용하도록 구성한다. 기존 명령인 `npm run build`, `npm test`,
-`pytest`, `docker compose config`는 유지한다. 추가 검사 도구는 구현 단계에서
-실제 의존성과 스크립트를 함께 추가한 후에만 CI에서 실행한다.
+`uv run pytest`, `docker compose config`는 유지한다. CI는 `uv.lock`이
+`pyproject.toml`과 일치하지 않으면 실패해야 하며 잠금 파일을 자동 갱신하지
+않는다. 추가 검사 도구는 구현 단계에서 실제 의존성과 스크립트를 함께 추가한
+후에만 CI에서 실행한다.
 
 ## 14. 추적성
 
@@ -795,6 +835,8 @@ CI 작업 디렉터리는 프론트엔드 `src/web/`, 백엔드 `src/api/`, E2E
       모두 거부한다.
 - [ ] 중식 조회에 `MMEAL_SC_CODE=2`가 강제된다.
 - [ ] `NEIS_API_KEY`가 백엔드 외부에 노출되지 않는다.
+- [ ] Python 의존성이 `pyproject.toml`과 커밋된 `uv.lock`으로 관리되며 로컬,
+      CI와 컨테이너에서 `uv sync --locked` 및 `uv run`을 사용한다.
 - [ ] 프론트엔드 통합 테스트, 백엔드 단위·통합 테스트와 Playwright E2E가
       핵심 사용자 흐름을 검증한다.
 - [ ] Docker Compose로 프론트엔드와 백엔드를 함께 빌드하고 실행할 수 있다.
